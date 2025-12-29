@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圍棋社比賽系統 - 冠亞季殿軍完整版</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #e67e22;
+            --bg-color: #f4f7f6;
+            --white: #ffffff;
+            --beginner-color: #2980b9;
+            --advanced-color: #c0392b;
+            --win-color: #27ae60;
+        }
+
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg-color); color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: var(--white); padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        h1, h2, h3 { text-align: center; color: var(--primary-color); }
+        
+        .form-section { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 30px; background: #eee; padding: 20px; border-radius: 8px; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-add { background: var(--primary-color); color: white; }
+        .btn-add:hover { background: #34495e; }
+
+        .admin-bar { text-align: right; margin-bottom: 10px; }
+        .admin-only { display: none; }
+        .is-admin .admin-only { display: inline-block; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; }
+        .tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white; }
+        .tag-entry { background: var(--beginner-color); }
+        .tag-adv { background: var(--advanced-color); }
+
+        /* 對戰表樣式 */
+        .bracket-wrapper { margin-top: 40px; padding: 25px; border: 2px solid #ddd; border-radius: 10px; position: relative; }
+        .bracket-container { display: flex; flex-direction: row; overflow-x: auto; padding: 20px; background: #222; border-radius: 8px; color: white; min-height: 300px; margin-top: 10px; }
+        .round { display: flex; flex-direction: column; justify-content: space-around; width: 180px; margin-right: 40px; flex-shrink: 0; }
+        .matchup { background: #333; border: 1px solid #444; border-radius: 6px; margin: 10px 0; padding: 5px; }
+        .match-title { font-size: 12px; color: #aaa; text-align: center; margin-bottom: 4px; }
+        .slot { padding: 8px; display: flex; justify-content: space-between; align-items: center; min-height: 20px; border-bottom: 1px solid #444; font-size: 14px; }
+        .slot:last-child { border-bottom: none; }
+        .winner-text { color: #f1c40f; font-weight: bold; }
+        .btn-win { background: var(--win-color); color: white; padding: 2px 6px; font-size: 10px; border-radius: 3px; }
+
+        /* 季軍賽與結果樣式 */
+        .special-match-box { margin-top: 20px; display: flex; gap: 20px; justify-content: center; }
+        .special-match { background: #2d3436; color: white; padding: 15px; border-radius: 8px; width: 250px; border: 1px solid var(--accent-color); }
+        .podium-box { background: #f1c40f; color: #2c3e50; padding: 20px; border-radius: 10px; margin-top: 20px; text-align: center; }
+        .podium-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; font-weight: bold; }
+
+        .btn-generate { color: white; width: 100%; font-size: 16px; margin-top: 10px; }
+        .btn-beg { background: var(--beginner-color); }
+        .btn-adv { background: var(--advanced-color); }
+    </style>
+</head>
+<body id="bodyTag">
+
+<div class="container">
+    <h1>圍棋社內部比賽系統</h1>
+
+    <div class="admin-bar">
+        <input type="password" id="adminPw" placeholder="管理員密碼" style="width:120px">
+        <button onclick="toggleAdmin()">管理員登入</button>
+    </div>
+
+    <div class="form-section">
+        <input type="text" id="userName" placeholder="姓名">
+        <input type="text" id="userId" placeholder="工號">
+        <select id="userLevel">
+            <option value="入門">入門組</option>
+            <option value="進階">進階組</option>
+        </select>
+        <button class="btn-add" onclick="register()">提交報名</button>
+    </div>
+
+    <h2>目前報名名單</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>姓名</th><th>工號</th><th>組別</th><th>報名時間</th><th class="admin-only">操作</th>
+            </tr>
+        </thead>
+        <tbody id="regList"></tbody>
+    </table>
+
+    <hr style="margin: 40px 0;">
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <button class="btn-generate btn-beg" onclick="createTournament('入門')">生成【入門組】對戰表</button>
+        <button class="btn-generate btn-adv" onclick="createTournament('進階')">生成【進階組】對戰表</button>
+    </div>
+
+    <div id="area-入門" class="bracket-wrapper" style="display:none;"></div>
+    <div id="area-進階" class="bracket-wrapper" style="display:none;"></div>
+</div>
+
+<script>
+    let participants = JSON.parse(localStorage.getItem('go_players')) || [];
+    let tournaments = JSON.parse(localStorage.getItem('go_structs_v2')) || { '入門': null, '進階': null };
+    let isAdmin = false;
+
+    renderAll();
+
+    function toggleAdmin() {
+        if (document.getElementById('adminPw').value === "admin123") {
+            isAdmin = !isAdmin;
+            document.getElementById('bodyTag').classList.toggle('is-admin');
+            alert(isAdmin ? "管理模式開啟" : "管理模式關閉");
+            renderAll();
+        } else { alert("密碼錯誤"); }
+    }
+
+    function register() {
+        const name = document.getElementById('userName').value;
+        const id = document.getElementById('userId').value;
+        const level = document.getElementById('userLevel').value;
+        if (!name || !id) return alert("請輸入完整資料");
+        participants.push({ name, id, level, time: new Date().toLocaleString('zh-TW', {hour12:false}) });
+        save(); renderAll();
+        document.getElementById('userName').value = ''; document.getElementById('userId').value = '';
+    }
+
+    function save() {
+        localStorage.setItem('go_players', JSON.stringify(participants));
+        localStorage.setItem('go_structs_v2', JSON.stringify(tournaments));
+    }
+
+    function createTournament(level) {
+        const players = participants.filter(p => p.level === level);
+        if (players.length < 2) return alert("人數不足");
+        if (!confirm("重新生成將清除進度，確定？")) return;
+
+        const roundCount = Math.ceil(Math.log2(players.length));
+        const totalSlots = Math.pow(2, roundCount);
+        let shuffled = [...players].sort(() => Math.random() - 0.5);
+
+        let bracket = [];
+        for (let r = 0; r < roundCount; r++) {
+            let matches = Math.pow(2, roundCount - r - 1);
+            bracket.push(new Array(matches).fill(null).map(() => ({ p1: null, p2: null, winner: null, loser: null })));
+        }
+
+        tournaments[level] = {
+            bracket: bracket,
+            thirdPlaceMatch: { p1: null, p2: null, winner: null, loser: null },
+            finalResult: null
+        };
+
+        // 填充第一輪
+        for (let i = 0; i < totalSlots; i += 2) {
+            const mIdx = i / 2;
+            const p1 = shuffled[i] || { name: "輪空", id: "BYE" };
+            const p2 = shuffled[i+1] || { name: "輪空", id: "BYE" };
+            tournaments[level].bracket[0][mIdx].p1 = p1;
+            tournaments[level].bracket[0][mIdx].p2 = p2;
+
+            if (p2.id === "BYE") {
+                tournaments[level].bracket[0][mIdx].winner = p1;
+                advance(level, 0, mIdx, p1, null);
+            } else if (p1.id === "BYE") {
+                tournaments[level].bracket[0][mIdx].winner = p2;
+                advance(level, 0, mIdx, p2, null);
+            }
+        }
+        save(); renderAll();
+    }
+
+    function setWin(level, rIdx, mIdx, pNum) {
+        const struct = tournaments[level];
+        const match = struct.bracket[rIdx][mIdx];
+        if (match.winner) return;
+
+        const winner = (pNum === 1) ? match.p1 : match.p2;
+        const loser = (pNum === 1) ? match.p2 : match.p1;
+        
+        match.winner = winner;
+        match.loser = loser;
+        advance(level, rIdx, mIdx, winner, loser);
+        save(); renderAll();
+    }
+
+    function setThirdWin(level, pNum) {
+        const match = tournaments[level].thirdPlaceMatch;
+        match.winner = (pNum === 1) ? match.p1 : match.p2;
+        match.loser = (pNum === 1) ? match.p2 : match.p1;
+        save(); renderAll();
+    }
+
+    function advance(level, rIdx, mIdx, winner, loser) {
+        const struct = tournaments[level];
+        const nextRound = rIdx + 1;
+        
+        // 如果是四強賽 (倒數第二輪)，敗者去季軍賽
+        if (rIdx === struct.bracket.length - 2 && loser) {
+            if (mIdx === 0) struct.thirdPlaceMatch.p1 = loser;
+            else struct.thirdPlaceMatch.p2 = loser;
+        }
+
+        // 晉級下一輪
+        if (nextRound < struct.bracket.length) {
+            const nextMIdx = Math.floor(mIdx / 2);
+            if (mIdx % 2 === 0) struct.bracket[nextRound][nextMIdx].p1 = winner;
+            else struct.bracket[nextRound][nextMIdx].p2 = winner;
+        }
+    }
+
+    function renderAll() {
+        // 名單渲染
+        const list = document.getElementById('regList');
+        list.innerHTML = '';
+        participants.forEach((p, i) => {
+            list.innerHTML += `<tr>
+                <td>${p.name}</td><td>${p.id}</td>
+                <td><span class="tag ${p.level==='入門'?'tag-entry':'tag-adv'}">${p.level}</span></td>
+                <td>${p.time}</td>
+                <td class="admin-only"><button onclick="deletePlayer(${i})" style="background:#e74c3c;color:white;">刪除</button></td>
+            </tr>`;
+        });
+
+        // 對戰表渲染
+        ['入門', '進階'].forEach(lvl => {
+            const area = document.getElementById('area-' + lvl);
+            if (!tournaments[lvl]) return area.style.display = 'none';
+            area.style.display = 'block';
+            area.innerHTML = `<h3>🏆 ${lvl}組賽程進度</h3>`;
+
+            const bracketBox = document.createElement('div');
+            bracketBox.className = 'bracket-container';
+            
+            tournaments[lvl].bracket.forEach((round, rIdx) => {
+                const rDiv = document.createElement('div');
+                rDiv.className = 'round';
+                const isFinal = (rIdx === tournaments[lvl].bracket.length - 1);
+                rDiv.innerHTML = `<h4>${isFinal ? '決賽' : '第 '+(rIdx+1)+' 輪'}</h4>`;
+                
+                round.forEach((m, mIdx) => {
+                    const mDiv = document.createElement('div');
+                    mDiv.className = 'matchup';
+                    mDiv.innerHTML = `
+                        <div class="slot ${m.winner?.id === m.p1?.id && m.winner ? 'winner-text' : ''}">
+                            <span>${m.p1 ? m.p1.name : '...'}</span>
+                            ${isAdmin && m.p1 && !m.winner && m.p1.id!=='BYE' ? `<button class="btn-win" onclick="setWin('${lvl}',${rIdx},${mIdx},1)">勝</button>` : ''}
+                        </div>
+                        <div class="slot ${m.winner?.id === m.p2?.id && m.winner ? 'winner-text' : ''}">
+                            <span>${m.p2 ? m.p2.name : '...'}</span>
+                            ${isAdmin && m.p2 && !m.winner && m.p2.id!=='BYE' ? `<button class="btn-win" onclick="setWin('${lvl}',${rIdx},${mIdx},2)">勝</button>` : ''}
+                        </div>`;
+                    rDiv.appendChild(mDiv);
+                });
+                bracketBox.appendChild(rDiv);
+            });
+            area.appendChild(bracketBox);
+
+            // 季軍賽區域
+            const tMatch = tournaments[lvl].thirdPlaceMatch;
+            if (tMatch.p1 || tMatch.p2) {
+                const specialBox = document.createElement('div');
+                specialBox.className = 'special-match-box';
+                specialBox.innerHTML = `
+                    <div class="special-match">
+                        <div class="match-title">🥉 季軍賽 (季殿軍決定)</div>
+                        <div class="slot ${tMatch.winner?.id === tMatch.p1?.id && tMatch.winner ? 'winner-text' : ''}">
+                            <span>${tMatch.p1 ? tMatch.p1.name : '...'}</span>
+                            ${isAdmin && tMatch.p1 && !tMatch.winner ? `<button class="btn-win" onclick="setThirdWin('${lvl}',1)">勝</button>` : ''}
+                        </div>
+                        <div class="slot ${tMatch.winner?.id === tMatch.p2?.id && tMatch.winner ? 'winner-text' : ''}">
+                            <span>${tMatch.p2 ? tMatch.p2.name : '...'}</span>
+                            ${isAdmin && tMatch.p2 && !tMatch.winner ? `<button class="btn-win" onclick="setThirdWin('${lvl}',2)">勝</button>` : ''}
+                        </div>
+                    </div>`;
+                area.appendChild(specialBox);
+            }
+
+            // 最終榮譽榜
+            const finalMatch = tournaments[lvl].bracket[tournaments[lvl].bracket.length - 1][0];
+            if (finalMatch.winner && tMatch.winner) {
+                const podium = document.createElement('div');
+                podium.className = 'podium-box';
+                podium.innerHTML = `
+                    <h3>🎉 ${lvl}組 比賽圓滿結束 🎉</h3>
+                    <div class="podium-grid">
+                        <div>🥇 冠軍：${finalMatch.winner.name}</div>
+                        <div>🥈 亞軍：${finalMatch.loser.name}</div>
+                        <div>🥉 季軍：${tMatch.winner.name}</div>
+                        <div>🏅 殿軍：${tMatch.loser.name}</div>
+                    </div>`;
+                area.appendChild(podium);
+            }
+        });
+    }
+
+    function deletePlayer(idx) {
+        if (confirm("刪除報名？")) { participants.splice(idx, 1); save(); renderAll(); }
+    }
+</script>
+
+</body>
+</html>
