@@ -35,8 +35,29 @@
         button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
         button:hover { opacity: 0.9; }
         button.danger { background: #c0392b; }
+        button.success { background: #27ae60; }
         button.admin-btn { background: var(--accent); display: none; margin-left: 10px; }
         button.logout-btn { background: #7f8c8d; font-size: 0.8em; padding: 5px 10px; margin-top: 5px; }
+
+        /* Admin Controls */
+        .admin-controls-panel {
+            display: none; /* hidden by default */
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .registration-closed-msg {
+            display: none;
+            color: #c0392b;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            border: 1px dashed #c0392b;
+            background: #fdedec;
+            margin-top: 10px;
+        }
 
         /* Table Styles */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -53,6 +74,7 @@
         /* Admin Mode */
         body.is-admin .admin-btn { display: inline-block; }
         body.is-admin .admin-action { display: table-cell; }
+        body.is-admin .admin-controls-panel { display: block; }
         .admin-action { display: none; width: 80px; text-align: center; }
         
         body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
@@ -99,22 +121,36 @@
 
     <div id="register" class="tab-content active">
         <h2>選手報名</h2>
-        <div class="form-group">
-            <label>組別</label>
-            <select id="regCategory">
-                <option value="beginner">入門組</option>
-                <option value="advanced">進階組</option>
-            </select>
+        
+        <div class="admin-controls-panel">
+            <strong>🔧 管理員控制：</strong>
+            <button class="success" onclick="toggleRegistration(true)">🟢 開啟報名</button>
+            <button class="danger" onclick="toggleRegistration(false)">🔴 截止報名</button>
+            <span id="adminRegStatus" style="margin-left:10px; font-weight:bold;"></span>
         </div>
-        <div class="form-group">
-            <label>姓名</label>
-            <input type="text" id="regName" placeholder="請輸入姓名">
+
+        <div id="registrationForm">
+            <div class="form-group">
+                <label>組別</label>
+                <select id="regCategory">
+                    <option value="beginner">入門組</option>
+                    <option value="advanced">進階組</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>姓名</label>
+                <input type="text" id="regName" placeholder="請輸入姓名">
+            </div>
+            <div class="form-group">
+                <label>工號</label>
+                <input type="text" id="regEmpId" placeholder="請輸入工號">
+            </div>
+            <button id="submitBtn" onclick="submitRegistration()">提交報名</button>
         </div>
-        <div class="form-group">
-            <label>工號</label>
-            <input type="text" id="regEmpId" placeholder="請輸入工號">
+
+        <div id="regClosedMsg" class="registration-closed-msg">
+            ⚠️ 目前報名已截止，請聯繫管理員。
         </div>
-        <button onclick="submitRegistration()">提交報名</button>
     </div>
 
     <div id="list" class="tab-content">
@@ -136,7 +172,10 @@
     <div id="bracket-beginner" class="tab-content">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h2>入門組 對戰表</h2>
-            <button class="admin-btn" onclick="generateBracket('beginner')">重新產生對戰表</button>
+            <div>
+                <button class="admin-btn danger" onclick="clearBracket('beginner')">🗑️ 清空對戰表</button>
+                <button class="admin-btn" onclick="generateBracket('beginner')">重新產生對戰表</button>
+            </div>
         </div>
         <div id="beginner-bracket-area" class="bracket-container"></div>
         <div id="beginner-3rd-place" class="third-place-container" style="display:none;">
@@ -149,7 +188,10 @@
     <div id="bracket-advanced" class="tab-content">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <h2>進階組 對戰表</h2>
-            <button class="admin-btn" onclick="generateBracket('advanced')">重新產生對戰表</button>
+            <div>
+                <button class="admin-btn danger" onclick="clearBracket('advanced')">🗑️ 清空對戰表</button>
+                <button class="admin-btn" onclick="generateBracket('advanced')">重新產生對戰表</button>
+            </div>
         </div>
         <div id="advanced-bracket-area" class="bracket-container"></div>
         <div id="advanced-3rd-place" class="third-place-container" style="display:none;">
@@ -176,11 +218,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Admin Logic (Secure Hash Version) ---
+    // --- Admin Logic ---
     let clickCount = 0;
     let isAdmin = false;
-
-    // TODO: 請在下面這裡填入您在 Console 算出來的長字串
+    // SHA-256 雜湊值
     const targetHash = "43b2d122712ab1d4778f7d4ff86337f7c9aeb6d5e3ac0d0626e7288258f6a836"; 
 
     // Check persistence
@@ -204,7 +245,6 @@
             const pwd = prompt("請輸入管理員密碼：");
             if (pwd) {
                 const inputHash = await sha256(pwd);
-                // Compare hash
                 if (inputHash === targetHash) {
                     enableAdminMode();
                     alert("管理員模式已開啟");
@@ -216,15 +256,12 @@
         }
     });
 
-    // Cache Data
-    let cacheBeginnerData = null;
-    let cacheAdvancedData = null;
-
     function enableAdminMode() {
         isAdmin = true;
         localStorage.setItem('goClubAdmin', 'true');
         document.body.classList.add('is-admin');
         document.getElementById('adminStatus').style.display = 'block';
+        updateRegistrationUI(); // Refresh UI with admin privileges
         
         renderList();
         if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
@@ -236,6 +273,7 @@
         localStorage.removeItem('goClubAdmin');
         document.body.classList.remove('is-admin');
         document.getElementById('adminStatus').style.display = 'none';
+        updateRegistrationUI(); // Refresh UI to hide admin controls
         
         renderList();
         if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
@@ -252,8 +290,56 @@
         document.getElementById(tabId).classList.add('active');
     }
 
+    // --- Registration Status Logic ---
+    let isRegistrationOpen = true; // Default
+
+    // Listen to Firebase for status changes
+    db.ref('config/registrationOpen').on('value', (snapshot) => {
+        const val = snapshot.val();
+        isRegistrationOpen = (val === null) ? true : val; // Default to true if not set
+        updateRegistrationUI();
+    });
+
+    function toggleRegistration(status) {
+        db.ref('config/registrationOpen').set(status);
+        alert(status ? "報名已開啟" : "報名已截止");
+    }
+
+    function updateRegistrationUI() {
+        const formDiv = document.getElementById('registrationForm');
+        const closedMsg = document.getElementById('regClosedMsg');
+        const adminStatusLabel = document.getElementById('adminRegStatus');
+        
+        // Admin Label Update
+        adminStatusLabel.innerText = isRegistrationOpen ? "(目前狀態：開啟)" : "(目前狀態：截止)";
+        adminStatusLabel.style.color = isRegistrationOpen ? "green" : "red";
+
+        // Logic:
+        // If Admin: Always see form (to help ppl sign up manually) + see controls
+        // If User: Only see form if Open. If Closed, see message.
+        
+        if (isAdmin) {
+            formDiv.style.display = 'block';
+            closedMsg.style.display = 'none';
+        } else {
+            if (isRegistrationOpen) {
+                formDiv.style.display = 'block';
+                closedMsg.style.display = 'none';
+            } else {
+                formDiv.style.display = 'none';
+                closedMsg.style.display = 'block';
+            }
+        }
+    }
+
     // --- Registration Logic ---
     function submitRegistration() {
+        // Double check client side (rule of thumb)
+        if (!isRegistrationOpen && !isAdmin) {
+            alert("抱歉，報名已截止。");
+            return;
+        }
+
         const name = document.getElementById('regName').value.trim();
         const empId = document.getElementById('regEmpId').value.trim();
         const category = document.getElementById('regCategory').value;
@@ -344,6 +430,16 @@
     }
 
     // --- Bracket Logic ---
+
+    // New Function: Clear Bracket Only
+    function clearBracket(category) {
+        if (!confirm(`確定要清空【${category === 'beginner' ? '入門組' : '進階組'}】的對戰表嗎？\n(報名資料會保留)`)) return;
+        
+        db.ref(`tournament/${category}`).remove().then(() => {
+            alert("對戰表已清空");
+        });
+    }
+
     function generateBracket(category) {
         if (!confirm("確定要重新產生對戰表嗎？這將清除目前的比賽進度！")) return;
 
@@ -354,6 +450,7 @@
             return;
         }
 
+        // Shuffle
         for (let i = participants.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [participants[i], participants[j]] = [participants[j], participants[i]];
@@ -414,6 +511,10 @@
             timestamp: Date.now()
         });
     }
+
+    // Cache Data
+    let cacheBeginnerData = null;
+    let cacheAdvancedData = null;
 
     ['beginner', 'advanced'].forEach(cat => {
         db.ref(`tournament/${cat}`).on('value', snapshot => {
