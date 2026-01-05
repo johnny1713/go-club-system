@@ -55,9 +55,8 @@
         body.is-admin .admin-action { display: table-cell; }
         .admin-action { display: none; width: 80px; text-align: center; }
         
-        /* 讓管理者知道這個名字可以點 */
         body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
-        body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; } /* 紅色提示可以取消 */
+        body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; }
 
         /* Bracket Styles */
         .bracket-container { display: flex; overflow-x: auto; padding: 20px 0; min-height: 400px; }
@@ -177,32 +176,49 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Admin Logic (With Persistence) ---
+    // --- Admin Logic (Secure Hash Version) ---
     let clickCount = 0;
     let isAdmin = false;
-    const adminPassword = "Qrdc18933"; 
 
-    // Cache Data
-    let cacheBeginnerData = null;
-    let cacheAdvancedData = null;
+    // TODO: 請在下面這裡填入您在 Console 算出來的長字串
+    const targetHash = "43b2d122712ab1d4778f7d4ff86337f7c9aeb6d5e3ac0d0626e7288258f6a836"; 
 
-    // Check localStorage on load
+    // Check persistence
     if (localStorage.getItem('goClubAdmin') === 'true') {
         enableAdminMode();
     }
 
-    document.getElementById('appTitle').addEventListener('click', () => {
+    async function sha256(message) {
+        const msgBuffer = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    }
+
+    document.getElementById('appTitle').addEventListener('click', async () => {
         clickCount++;
-        if (clickCount === 16) {
-            if (isAdmin) return; // Already admin
+        if (clickCount === 32) {
+            if (isAdmin) return; 
+            
             const pwd = prompt("請輸入管理員密碼：");
-            if (pwd === adminPassword) {
-                enableAdminMode();
-                alert("管理員模式已開啟");
+            if (pwd) {
+                const inputHash = await sha256(pwd);
+                // Compare hash
+                if (inputHash === targetHash) {
+                    enableAdminMode();
+                    alert("管理員模式已開啟");
+                } else {
+                    alert("密碼錯誤");
+                }
             }
             clickCount = 0;
         }
     });
+
+    // Cache Data
+    let cacheBeginnerData = null;
+    let cacheAdvancedData = null;
 
     function enableAdminMode() {
         isAdmin = true;
@@ -210,7 +226,6 @@
         document.body.classList.add('is-admin');
         document.getElementById('adminStatus').style.display = 'block';
         
-        // Trigger Re-renders
         renderList();
         if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
         if(cacheAdvancedData) renderBracketUI('advanced', cacheAdvancedData.rounds, cacheAdvancedData.thirdPlace);
@@ -222,7 +237,6 @@
         document.body.classList.remove('is-admin');
         document.getElementById('adminStatus').style.display = 'none';
         
-        // Trigger Re-renders
         renderList();
         if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
         if(cacheAdvancedData) renderBracketUI('advanced', cacheAdvancedData.rounds, cacheAdvancedData.thirdPlace);
@@ -457,7 +471,6 @@
             container.appendChild(roundDiv);
         });
 
-        // Champion Display
         const finalRoundIndex = rounds.length - 1;
         const finalMatch = rounds[finalRoundIndex][0];
         const champDiv = document.getElementById(`${category}-champion`);
@@ -471,7 +484,6 @@
             champDiv.style.display = 'none';
         }
 
-        // 3rd Place Logic
         if (rounds.length >= 2) {
             const semiRound = rounds[rounds.length - 2];
             const semi1 = semiRound[0];
@@ -518,16 +530,12 @@
         
         if (isAdmin) {
             const opponentId = opponent ? opponent.id : null;
-
-            // 1. Set Winner Logic (沒人贏，兩人都在，對手不是空)
             if (!matchWinnerId && player.id && player.id !== 'BYE' && opponentId) {
                 classes += ' clickable';
                 clickAction = `onclick="setWinner('${category}', '${rIdx}', ${mIdx}, '${player.id}')"`;
             }
-            // 2. Undo Logic (已經贏了，點擊獲勝者，且對手不是BYE)
             else if (matchWinnerId && matchWinnerId === player.id && opponentId !== 'BYE') {
                 classes += ' undoable';
-                // 修正：傳遞 integer 的參數比較安全
                 clickAction = `onclick="resetMatch('${category}', '${rIdx}', ${mIdx})"`;
             }
         }
@@ -548,7 +556,6 @@
                 const data = snap.val();
                 const rounds = data.rounds;
                 
-                // Advance to next round
                 if (roundIdx + 1 < rounds.length) {
                     const nextMatchIdx = Math.floor(matchIdx / 2);
                     const nextSlot = (matchIdx % 2 === 0) ? 'p1' : 'p2';
@@ -557,7 +564,6 @@
                     db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set(winnerObj);
                 }
                 
-                // Populate 3rd Place if Semi-Finals finished
                 if (roundIdx === rounds.length - 2) {
                      const currentMatch = rounds[roundIdx][matchIdx];
                      const loserObj = (currentMatch.p1.id === winnerId) ? currentMatch.p2 : currentMatch.p1;
@@ -582,7 +588,6 @@
             const data = snap.val();
             const rounds = data.rounds;
 
-            // Check validity: if next round has a winner, deny undo
             if (roundIdx + 1 < rounds.length) {
                 const nextMatchIdx = Math.floor(matchIdx / 2);
                 const nextMatch = rounds[roundIdx + 1][nextMatchIdx];
@@ -592,7 +597,6 @@
                 }
             }
 
-            // Execute Undo
             db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({ winner: null });
 
             if (roundIdx + 1 < rounds.length) {
@@ -601,7 +605,6 @@
                 db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set({ name: "TBD", id: null });
             }
 
-            // Undo 3rd place population if Semi-Final
             if (roundIdx === rounds.length - 2) {
                  const thirdSlot = (matchIdx === 0) ? 'p1' : 'p2';
                  db.ref(`tournament/${category}/thirdPlace/${thirdSlot}`).set({ name: "TBD", id: null });
