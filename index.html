@@ -11,7 +11,7 @@
         :root {
             --primary: #2c3e50;
             --accent: #d35400;
-            --bg: #fdfbf7; /* 棋盤木頭色調 */
+            --bg: #fdfbf7;
             --board-color: #e6b35c;
         }
         body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
@@ -28,7 +28,7 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Form & List */
+        /* Form */
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
@@ -37,15 +37,23 @@
         button.danger { background: #c0392b; }
         button.admin-btn { background: var(--accent); display: none; margin-left: 10px; }
 
+        /* Table Styles */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
         th { background-color: var(--primary); color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
 
-        /* Admin Mode Styling */
+        /* Tag Styles for Categories */
+        .tag { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.9em; display: inline-block; font-weight: bold; text-align: center; min-width: 60px;}
+        .tag-beginner { background-color: #27ae60; } /* 綠色 */
+        .tag-advanced { background-color: #c0392b; } /* 紅色 */
+
+        .time-text { font-size: 0.85em; color: #666; }
+
+        /* Admin Mode */
         body.is-admin .admin-btn { display: inline-block; }
         body.is-admin .admin-action { display: table-cell; }
-        .admin-action { display: none; }
+        .admin-action { display: none; width: 80px; text-align: center; }
 
         /* Bracket Styles */
         .bracket-container { display: flex; overflow-x: auto; padding: 20px 0; min-height: 400px; }
@@ -57,22 +65,15 @@
         .player:hover { background-color: #f0f0f0; }
         .player.winner { font-weight: bold; color: green; }
         .player.loser { color: #999; text-decoration: line-through; }
-        .player input { width: 80%; padding: 2px; font-size: 12px; }
-
-        .score { font-size: 0.8em; color: #666; }
         
-        /* 冠軍標示 */
+        /* 冠軍與季軍 */
         .champion-box { text-align: center; border: 2px solid gold; background: #fffdf0; margin-top: 20px; padding: 20px; display: none; }
-        
-        /* 季殿軍區塊 */
         .third-place-container { margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px; }
         .third-place-title { font-weight: bold; color: var(--accent); margin-bottom: 10px; }
 
-        /* Connecting Lines (Simplified) */
         .round:not(:first-child) .match::before {
             content: ""; position: absolute; left: -20px; top: 50%; width: 20px; height: 1px; background: #ccc;
         }
-
         .edit-input { width: 100px; padding: 2px; }
     </style>
 </head>
@@ -92,19 +93,19 @@
     <div id="register" class="tab-content active">
         <h2>選手報名</h2>
         <div class="form-group">
+            <label>組別</label>
+            <select id="regCategory">
+                <option value="beginner">入門組</option>
+                <option value="advanced">進階組</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label>姓名</label>
             <input type="text" id="regName" placeholder="請輸入姓名">
         </div>
         <div class="form-group">
             <label>工號</label>
             <input type="text" id="regEmpId" placeholder="請輸入工號">
-        </div>
-        <div class="form-group">
-            <label>組別</label>
-            <select id="regCategory">
-                <option value="beginner">入門組</option>
-                <option value="advanced">進階組</option>
-            </select>
         </div>
         <button onclick="submitRegistration()">提交報名</button>
     </div>
@@ -114,10 +115,10 @@
         <table>
             <thead>
                 <tr>
-                    <th>報名時間</th>
-                    <th>組別</th>
+                    <th style="width: 100px;">組別</th>
                     <th>姓名</th>
                     <th>工號</th>
+                    <th>報名時間</th>
                     <th class="admin-action">管理操作</th>
                 </tr>
             </thead>
@@ -154,7 +155,7 @@
 </div>
 
 <script>
-    // 12. Firebase Configuration
+    // Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
         authDomain: "go-club-818e2.firebaseapp.com",
@@ -166,14 +167,13 @@
         measurementId: "G-3S2G8R5QJD"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Admin Logic (Backdoor) ---
+    // --- Admin Logic ---
     let clickCount = 0;
     let isAdmin = false;
-    const adminPassword = "admin"; // 簡單密碼，可自行修改
+    const adminPassword = "Qrdc18933"; 
 
     document.getElementById('appTitle').addEventListener('click', () => {
         clickCount++;
@@ -184,7 +184,7 @@
                 document.body.classList.add('is-admin');
                 document.getElementById('adminStatus').style.display = 'block';
                 alert("管理員模式已開啟");
-                renderList(); // Re-render list to show edit buttons
+                renderList();
             }
             clickCount = 0;
         }
@@ -194,8 +194,6 @@
     function switchTab(tabId) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        
-        // Find the tab element based on the onclick attribute roughly or index
         const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
         const index = tabs.indexOf(tabId);
         document.querySelectorAll('.tab')[index].classList.add('active');
@@ -227,7 +225,7 @@
         });
     }
 
-    // --- List Logic ---
+    // --- List Logic (Updated) ---
     let allUsers = [];
 
     db.ref('users').on('value', (snapshot) => {
@@ -250,13 +248,18 @@
 
         allUsers.forEach(user => {
             const dateStr = new Date(user.timestamp).toLocaleString('zh-TW');
-            const catStr = user.category === 'beginner' ? '入門' : '進階';
             
+            // Logic for Tags
+            const isBeginner = user.category === 'beginner';
+            const catClass = isBeginner ? 'tag-beginner' : 'tag-advanced';
+            const catText = isBeginner ? '入門' : '進階';
+
+            // Updated Column Order: Category -> Name -> ID -> Time
             let row = `<tr>
-                <td>${dateStr}</td>
-                <td>${catStr}</td>
+                <td><span class="tag ${catClass}">${catText}</span></td>
                 <td>${isAdmin ? `<input class='edit-input' value='${user.name}' onchange='updateUser("${user.id}", "name", this.value)'>` : user.name}</td>
                 <td>${isAdmin ? `<input class='edit-input' value='${user.empId}' onchange='updateUser("${user.id}", "empId", this.value)'>` : user.empId}</td>
+                <td class="time-text">${dateStr}</td>
                 <td class="admin-action">
                     <button class="danger" onclick="deleteUser('${user.id}')">刪除</button>
                 </td>
@@ -276,12 +279,9 @@
     }
 
     // --- Bracket Logic ---
-
-    // Generate Bracket Structure
     function generateBracket(category) {
         if (!confirm("確定要重新產生對戰表嗎？這將清除目前的比賽進度！")) return;
 
-        // Filter users for this category
         const participants = allUsers.filter(u => u.category === category).map(u => ({ name: u.name, id: u.id }));
         
         if (participants.length < 2) {
@@ -295,11 +295,9 @@
             [participants[i], participants[j]] = [participants[j], participants[i]];
         }
 
-        // Calculate size (power of 2)
         let size = 1;
         while (size < participants.length) size *= 2;
 
-        // Fill with Byes
         const bracket = [];
         for (let i = 0; i < size; i++) {
             if (i < participants.length) {
@@ -309,12 +307,8 @@
             }
         }
 
-        // Create Matches Structure
-        // We will store rounds. Round 0 is the first round.
-        // Round 0 has size/2 matches. Round 1 has size/4 matches...
-        
         const rounds = [];
-        let currentRoundPlayers = bracket.map(p => ({...p})); // Clone
+        let currentRoundPlayers = bracket.map(p => ({...p})); 
 
         let roundCount = Math.log2(size);
         
@@ -326,13 +320,8 @@
                 let p1 = currentRoundPlayers[m * 2];
                 let p2 = currentRoundPlayers[m * 2 + 1];
                 
-                let match = {
-                    p1: p1,
-                    p2: p2,
-                    winner: null // will be id
-                };
+                let match = { p1: p1, p2: p2, winner: null };
 
-                // Auto advance if BYE
                 if (p1.id === 'BYE') match.winner = p2.id;
                 else if (p2.id === 'BYE') match.winner = p1.id;
 
@@ -340,21 +329,16 @@
             }
             
             rounds.push(matches);
-            
-            // Prepare next round placeholder
             currentRoundPlayers = matches.map(() => ({ name: "TBD", id: null }));
         }
 
-        // Save to Firebase
-        // Clear old data first to prevent issues
         db.ref(`tournament/${category}`).set({
             rounds: rounds,
-            thirdPlace: { p1: null, p2: null, winner: null }, // Initialize 3rd place match
+            thirdPlace: { p1: null, p2: null, winner: null },
             timestamp: Date.now()
         });
     }
 
-    // Listener for Bracket Rendering
     ['beginner', 'advanced'].forEach(cat => {
         db.ref(`tournament/${cat}`).on('value', snapshot => {
             const data = snapshot.val();
@@ -372,7 +356,6 @@
         const container = document.getElementById(`${category}-bracket-area`);
         container.innerHTML = '';
         
-        // Main Bracket
         rounds.forEach((roundMatches, roundIndex) => {
             const roundDiv = document.createElement('div');
             roundDiv.className = 'round';
@@ -381,19 +364,11 @@
                 const matchDiv = document.createElement('div');
                 matchDiv.className = 'match';
                 
-                // Determine names (if previous round winner exists, use that)
-                // Logic: In rounds > 0, we need to look at previous round results
-                // However, our data structure saves the state in 'rounds', so we just read from it.
-                // But we need to ensure "TBD" names are updated if the data says so.
-                // Actually, the click handler updates the DB, so we just render what's in DB.
-                
-                // Logic check: If it's not Round 0, update names based on previous round winners
                 if (roundIndex > 0) {
                     const prevRound = rounds[roundIndex - 1];
                     const p1SourceMatch = prevRound[matchIndex * 2];
                     const p2SourceMatch = prevRound[matchIndex * 2 + 1];
 
-                    // Update P1 info
                     if (p1SourceMatch.winner) {
                         const winnerObj = (p1SourceMatch.winner === p1SourceMatch.p1.id) ? p1SourceMatch.p1 : p1SourceMatch.p2;
                         match.p1 = winnerObj;
@@ -401,7 +376,6 @@
                          match.p1 = { name: "等待中...", id: null };
                     }
 
-                    // Update P2 info
                     if (p2SourceMatch.winner) {
                         const winnerObj = (p2SourceMatch.winner === p2SourceMatch.p1.id) ? p2SourceMatch.p1 : p2SourceMatch.p2;
                         match.p2 = winnerObj;
@@ -410,7 +384,6 @@
                     }
                 }
 
-                // Render Players
                 const p1Html = createPlayerHtml(match.p1, match.winner, category, roundIndex, matchIndex, 'p1');
                 const p2Html = createPlayerHtml(match.p2, match.winner, category, roundIndex, matchIndex, 'p2');
                 
@@ -421,49 +394,34 @@
             container.appendChild(roundDiv);
         });
 
-        // 3rd Place & Champion Logic
+        // Champion & 3rd Place
         const finalRoundIndex = rounds.length - 1;
         const finalMatch = rounds[finalRoundIndex][0];
-        
-        // 1. Champion Display
         const champDiv = document.getElementById(`${category}-champion`);
+        
         if (finalMatch.winner && finalMatch.winner !== 'BYE') {
             const champion = (finalMatch.winner === finalMatch.p1.id) ? finalMatch.p1 : finalMatch.p2;
             const runnerUp = (finalMatch.winner === finalMatch.p1.id) ? finalMatch.p2 : finalMatch.p1;
-            
             champDiv.style.display = 'block';
             champDiv.innerHTML = `<h3>🏆 冠軍：${champion.name}</h3><h4>🥈 亞軍：${runnerUp.name}</h4>`;
         } else {
             champDiv.style.display = 'none';
         }
 
-        // 2. 3rd Place Logic
-        // Trigger: When Semi-Finals (Round N-1) are both done.
         if (rounds.length >= 2) {
             const semiRound = rounds[rounds.length - 2];
             const semi1 = semiRound[0];
             const semi2 = semiRound[1];
 
             if (semi1.winner && semi2.winner) {
-                // Determine losers
                 const loser1 = (semi1.winner === semi1.p1.id) ? semi1.p2 : semi1.p1;
                 const loser2 = (semi2.winner === semi2.p1.id) ? semi2.p2 : semi2.p1;
 
                 if (loser1.id !== 'BYE' && loser2.id !== 'BYE') {
-                    // Update DB with 3rd place match players if not set
-                    // Warning: Avoid infinite loop. Only update if data is different.
-                    if ((!thirdPlaceData || thirdPlaceData.p1?.id !== loser1.id || thirdPlaceData.p2?.id !== loser2.id) && isAdmin) {
-                         // We only auto-set players, not winner
-                         // This is tricky in a render loop. Ideally, this should be done in the winHandler.
-                         // But for simplicity, we check equality roughly.
-                    }
-                    
-                    // Render 3rd Place Match
                     const thirdContainer = document.getElementById(`${category}-3rd-place`);
                     thirdContainer.style.display = 'block';
                     const thirdMatchDiv = document.getElementById(`${category}-3rd-match`);
                     
-                    // Construct a fake match object for rendering
                     const p1 = loser1;
                     const p2 = loser2;
                     const winner = thirdPlaceData ? thirdPlaceData.winner : null;
@@ -473,7 +431,6 @@
                     
                     thirdMatchDiv.innerHTML = `<div class="match" style="width:200px;">${tp1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${tp2Html}</div>`;
                     
-                    // Show 3rd/4th result if done
                     if (winner) {
                         const p3 = (winner === p1.id) ? p1.name : p2.name;
                         const p4 = (winner === p1.id) ? p2.name : p1.name;
@@ -492,84 +449,37 @@
         }
         
         let clickAction = '';
-        let editAction = '';
-        
-        // Edit Name feature for Admin
-        if (isAdmin && player.id && player.id !== 'BYE') {
-             // We allow editing name in the bracket for quick fixes, though it doesn't sync back to user list, only bracket.
-             // Simplification: Just show name.
-        }
-
-        // Set Winner Action
-        // Allows clicking if: Admin mode OR (Friendly mode - anyone can click). 
-        // User requested: "Opponent table can click win". Let's allow click to advance.
         if (player.id && player.id !== 'BYE' && !matchWinnerId) {
             clickAction = `onclick="setWinner('${category}', '${rIdx}', ${mIdx}, '${player.id}', '${slot}')"`;
         }
 
-        return `<div class="${classes}" ${clickAction}>
-                    <span>${player.name || '-'}</span>
-                </div>`;
+        return `<div class="${classes}" ${clickAction}><span>${player.name || '-'}</span></div>`;
     }
 
     function setWinner(category, roundIdx, matchIdx, winnerId, slot) {
         if (!confirm(`確認 ${winnerId === 'BYE' ? '輪空' : '該選手'} 獲勝嗎？`)) return;
 
         if (roundIdx === 'third') {
-            // Handle 3rd place match
-            db.ref(`tournament/${category}/thirdPlace`).update({
-                winner: winnerId
-            });
+            db.ref(`tournament/${category}/thirdPlace`).update({ winner: winnerId });
         } else {
-            // Handle standard bracket
             roundIdx = parseInt(roundIdx);
-            
-            // 1. Update current match winner
-            db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({
-                winner: winnerId
-            });
+            db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({ winner: winnerId });
 
-            // 2. Logic to handle "Next Round" population happens automatically in render 
-            // BUT we should ideally check if it's the semi-final to populate 3rd place
-            // Or if it's any round, ensure the next round exists.
-            
-            // Since our 'render' function calculates data dynamically based on previous rounds,
-            // strictly speaking, we don't NEED to write to the next round in DB if we calculate it on the fly.
-            // HOWEVER, my generate function created placeholders.
-            // Let's rely on the render logic visually, but the DB structure is `rounds`.
-            // The `rounds` array in DB is static. So when R0 finishes, R1 data in DB is still empty placeholders.
-            // We need to validly push the winner to the next round in the DB to make it persistent and editable.
-            
-            // Fetch current state to update next round
             db.ref(`tournament/${category}`).once('value').then(snap => {
                 const data = snap.val();
                 const rounds = data.rounds;
                 
-                // If there is a next round
                 if (roundIdx + 1 < rounds.length) {
                     const nextMatchIdx = Math.floor(matchIdx / 2);
                     const nextSlot = (matchIdx % 2 === 0) ? 'p1' : 'p2';
-                    
-                    // Find who won (object)
                     const currentMatch = rounds[roundIdx][matchIdx];
                     const winnerObj = (currentMatch.p1.id === winnerId) ? currentMatch.p1 : currentMatch.p2;
-
-                    // Update next round
                     db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set(winnerObj);
-                } else {
-                    // Final round finished
-                    // Trigger refresh to show champion
                 }
-
-                // Special Check: Are we in Semi-Finals? (Round N-2)
-                // rounds.length = Total rounds.
-                // If rounds.length = 3 (8 people). R0=Q, R1=Semi, R2=Final.
-                // If we just finished R1, populate 3rd place.
+                
                 if (roundIdx === rounds.length - 2) {
                      const currentMatch = rounds[roundIdx][matchIdx];
                      const loserObj = (currentMatch.p1.id === winnerId) ? currentMatch.p2 : currentMatch.p1;
-                     
-                     // Need to figure out if we are match 0 or 1 in semi-final to put in p1 or p2 of 3rd place
                      const thirdSlot = (matchIdx === 0) ? 'p1' : 'p2';
                      db.ref(`tournament/${category}/thirdPlace/${thirdSlot}`).set(loserObj);
                 }
