@@ -3,266 +3,580 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圍棋社雲端比賽系統 - 終極修正版</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <title>圍棋社比賽報名與對戰系統</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+
     <style>
-        :root { --primary-color: #2c3e50; --accent-color: #e67e22; --bg-color: #f4f7f6; --white: #ffffff; --beginner-color: #2980b9; --advanced-color: #c0392b; --win-color: #27ae60; }
-        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg-color); color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: auto; background: var(--white); padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1, h2, h3 { text-align: center; color: var(--primary-color); }
-        .form-section { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; margin-bottom: 30px; background: #eee; padding: 20px; border-radius: 8px; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        .btn-add { background: var(--primary-color); color: white; }
-        .admin-bar { text-align: right; margin-bottom: 10px; background: #dfe6e9; padding: 10px; border-radius: 5px; }
-        .admin-only { display: none; }
-        .is-admin .admin-only { display: inline-block; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        .tag { padding: 2px 8px; border-radius: 4px; font-size: 12px; color: white; }
-        .tag-entry { background: var(--beginner-color); }
-        .tag-adv { background: var(--advanced-color); }
+        :root {
+            --primary: #2c3e50;
+            --accent: #d35400;
+            --bg: #fdfbf7; /* 棋盤木頭色調 */
+            --board-color: #e6b35c;
+        }
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
         
-        /* 樹狀圖修正 */
-        .bracket-wrapper { margin-top: 40px; padding: 25px; border: 2px solid #ddd; border-radius: 10px; background: white; overflow-x: auto; }
-        .bracket-container { display: flex; flex-direction: row; padding: 20px; background: #222; border-radius: 8px; color: white; min-height: 400px; min-width: max-content; }
-        .round { display: flex; flex-direction: column; justify-content: space-around; width: 220px; margin-right: 50px; flex-shrink: 0; }
-        .matchup { background: #333; border: 1px solid #444; border-radius: 6px; margin: 15px 0; padding: 8px; }
-        .slot { padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-bottom: 1px solid #444; min-height: 30px; }
-        .slot:last-child { border-bottom: none; }
-        .winner-text { color: #f1c40f; font-weight: bold; }
-        .btn-win { background: var(--win-color); color: white; padding: 4px 8px; font-size: 11px; border-radius: 3px; border: none; }
-        .podium-box { background: #f1c40f; color: #2c3e50; padding: 20px; border-radius: 10px; margin-top: 20px; text-align: center; font-weight: bold; font-size: 18px; }
-        .btn-generate { color: white; width: 100%; margin-top: 10px; font-size: 16px; box-shadow: 0 4px 0 rgba(0,0,0,0.2); }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        h1 { text-align: center; color: var(--primary); cursor: pointer; user-select: none; }
+        h2 { border-bottom: 2px solid var(--board-color); padding-bottom: 10px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #eee; border-radius: 5px 5px 0 0; }
+        .tab.active { background: var(--primary); color: white; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form & List */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: #c0392b; }
+        button.admin-btn { background: var(--accent); display: none; margin-left: 10px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: var(--primary); color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+
+        /* Admin Mode Styling */
+        body.is-admin .admin-btn { display: inline-block; }
+        body.is-admin .admin-action { display: table-cell; }
+        .admin-action { display: none; }
+
+        /* Bracket Styles */
+        .bracket-container { display: flex; overflow-x: auto; padding: 20px 0; min-height: 400px; }
+        .round { display: flex; flex-direction: column; justify-content: space-around; min-width: 200px; margin-right: 40px; }
+        .match { background: #fff; border: 1px solid #ccc; margin: 10px 0; padding: 10px; border-radius: 4px; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .match:hover { border-color: var(--accent); }
+        
+        .player { padding: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .player:hover { background-color: #f0f0f0; }
+        .player.winner { font-weight: bold; color: green; }
+        .player.loser { color: #999; text-decoration: line-through; }
+        .player input { width: 80%; padding: 2px; font-size: 12px; }
+
+        .score { font-size: 0.8em; color: #666; }
+        
+        /* 冠軍標示 */
+        .champion-box { text-align: center; border: 2px solid gold; background: #fffdf0; margin-top: 20px; padding: 20px; display: none; }
+        
+        /* 季殿軍區塊 */
+        .third-place-container { margin-top: 30px; border-top: 2px dashed #ccc; padding-top: 20px; }
+        .third-place-title { font-weight: bold; color: var(--accent); margin-bottom: 10px; }
+
+        /* Connecting Lines (Simplified) */
+        .round:not(:first-child) .match::before {
+            content: ""; position: absolute; left: -20px; top: 50%; width: 20px; height: 1px; background: #ccc;
+        }
+
+        .edit-input { width: 100px; padding: 2px; }
     </style>
 </head>
-<body id="bodyTag">
+<body>
 
 <div class="container">
-    <h1>圍棋社雲端比賽系統</h1>
+    <h1 id="appTitle" title="點擊5次開啟管理員模式">圍棋社內部比賽系統</h1>
+    <div id="adminStatus" style="text-align:center; color: red; display:none;">(管理員模式已啟用)</div>
 
-    <div class="admin-bar">
-        <input type="password" id="adminPw" placeholder="密碼 admin123" style="width:120px">
-        <button onclick="toggleAdmin()">管理員登入</button>
-        <button onclick="location.reload()" style="background:#636e72; color:white;">強制刷新頁面</button>
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('register')">報名頁面</div>
+        <div class="tab" onclick="switchTab('list')">報名名單</div>
+        <div class="tab" onclick="switchTab('bracket-beginner')">入門組對戰表</div>
+        <div class="tab" onclick="switchTab('bracket-advanced')">進階組對戰表</div>
     </div>
 
-    <div class="form-section">
-        <input type="text" id="userName" placeholder="姓名">
-        <input type="text" id="userId" placeholder="工號">
-        <select id="userLevel">
-            <option value="入門">入門組</option>
-            <option value="進階">進階組</option>
-        </select>
-        <button class="btn-add" onclick="register()">提交報名</button>
+    <div id="register" class="tab-content active">
+        <h2>選手報名</h2>
+        <div class="form-group">
+            <label>姓名</label>
+            <input type="text" id="regName" placeholder="請輸入姓名">
+        </div>
+        <div class="form-group">
+            <label>工號</label>
+            <input type="text" id="regEmpId" placeholder="請輸入工號">
+        </div>
+        <div class="form-group">
+            <label>組別</label>
+            <select id="regCategory">
+                <option value="beginner">入門組</option>
+                <option value="advanced">進階組</option>
+            </select>
+        </div>
+        <button onclick="submitRegistration()">提交報名</button>
     </div>
 
-    <h2>目前報名名單</h2>
-    <table>
-        <thead><tr><th>姓名</th><th>工號</th><th>組別</th><th>時間</th><th class="admin-only">操作</th></tr></thead>
-        <tbody id="regList"></tbody>
-    </table>
-
-    <hr style="margin: 40px 0;">
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <button class="btn-generate" style="background:var(--beginner-color)" onclick="createTournament('入門')">生成【入門組】對戰表</button>
-        <button class="btn-generate" style="background:var(--advanced-color)" onclick="createTournament('進階')">生成【進階組】對戰表</button>
+    <div id="list" class="tab-content">
+        <h2>已報名名單</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>報名時間</th>
+                    <th>組別</th>
+                    <th>姓名</th>
+                    <th>工號</th>
+                    <th class="admin-action">管理操作</th>
+                </tr>
+            </thead>
+            <tbody id="registrantsTable">
+                </tbody>
+        </table>
     </div>
 
-    <div id="area-入門" class="bracket-wrapper" style="display:none;"></div>
-    <div id="area-進階" class="bracket-wrapper" style="display:none;"></div>
+    <div id="bracket-beginner" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>入門組 對戰表</h2>
+            <button class="admin-btn" onclick="generateBracket('beginner')">重新產生對戰表 (清除舊紀錄)</button>
+        </div>
+        <div id="beginner-bracket-area" class="bracket-container"></div>
+        <div id="beginner-3rd-place" class="third-place-container" style="display:none;">
+            <div class="third-place-title">季殿軍賽</div>
+            <div id="beginner-3rd-match"></div>
+        </div>
+        <div id="beginner-champion" class="champion-box"></div>
+    </div>
+
+    <div id="bracket-advanced" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>進階組 對戰表</h2>
+            <button class="admin-btn" onclick="generateBracket('advanced')">重新產生對戰表 (清除舊紀錄)</button>
+        </div>
+        <div id="advanced-bracket-area" class="bracket-container"></div>
+        <div id="advanced-3rd-place" class="third-place-container" style="display:none;">
+            <div class="third-place-title">季殿軍賽</div>
+            <div id="advanced-3rd-match"></div>
+        </div>
+        <div id="advanced-champion" class="champion-box"></div>
+    </div>
 </div>
 
 <script>
-    // 1. Firebase 配置 (請務必換成你自己的！)
+    // 12. Firebase Configuration
     const firebaseConfig = {
-		apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
-		authDomain: "go-club-818e2.firebaseapp.com",
-		databaseURL: "https://go-club-818e2-default-rtdb.firebaseio.com",
-		projectId: "go-club-818e2",
-		storageBucket: "go-club-818e2.firebasestorage.app",
-		messagingSenderId: "818869551072",
-		appId: "1:818869551072:web:8408991a2dedd1f9e1b585",
-		measurementId: "G-3S2G8R5QJD"
+        apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
+        authDomain: "go-club-818e2.firebaseapp.com",
+        databaseURL: "https://go-club-818e2-default-rtdb.firebaseio.com",
+        projectId: "go-club-818e2",
+        storageBucket: "go-club-818e2.firebasestorage.app",
+        messagingSenderId: "818869551072",
+        appId: "1:818869551072:web:8408991a2dedd1f9e1b585",
+        measurementId: "G-3S2G8R5QJD"
     };
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let participants = [];
-    let tournaments = { '入門': null, '進階': null };
+    // --- Admin Logic (Backdoor) ---
+    let clickCount = 0;
     let isAdmin = false;
+    const adminPassword = "admin"; // 簡單密碼，可自行修改
 
-    // 監聽名單
-    db.ref('players').on('value', (snap) => {
-        const data = snap.val();
-        participants = data ? Object.entries(data).map(([key, val]) => ({...val, fbKey: key})) : [];
-        renderAll();
-    });
-
-    // 監聽賽程
-    db.ref('tournaments').on('value', (snap) => {
-        tournaments = snap.val() || { '入門': null, '進階': null };
-        renderAll();
-    });
-
-    function toggleAdmin() {
-        if (document.getElementById('adminPw').value === "admin123") {
-            isAdmin = !isAdmin;
-            document.getElementById('bodyTag').classList.toggle('is-admin');
-            alert(isAdmin ? "已進入管理模式，現在可以看到『勝』按鈕了！" : "已登出管理模式");
-            renderAll();
-        } else { alert("密碼錯誤"); }
-    }
-
-    function register() {
-        const name = document.getElementById('userName').value;
-        const id = document.getElementById('userId').value;
-        const level = document.getElementById('userLevel').value;
-        if (!name || !id) return alert("請輸入完整資料");
-        db.ref('players').push({ name, id, level, time: new Date().toLocaleString() });
-        document.getElementById('userName').value = '';
-        document.getElementById('userId').value = '';
-    }
-
-    function deletePlayer(key) { if (confirm("確定刪除？")) db.ref('players/' + key).remove(); }
-
-    // 生成對戰表 (修正結構問題)
-    function createTournament(level) {
-        const players = participants.filter(p => p.level === level);
-        if (players.length < 2) return alert("人數不足 (至少 2 人)");
-        if (!isAdmin) return alert("請先登入管理員才能生成對戰表！");
-        if (!confirm("重新生成將會清空目前 " + level + " 組的所有進度，確定？")) return;
-
-        const roundCount = Math.ceil(Math.log2(players.length));
-        const totalSlots = Math.pow(2, roundCount);
-        let shuffled = [...players].sort(() => Math.random() - 0.5);
-
-        let bracket = [];
-        for (let r = 0; r < roundCount; r++) {
-            let mCount = Math.pow(2, roundCount - r - 1);
-            bracket.push(new Array(mCount).fill(null).map(() => ({ p1: null, p2: null, winner: null, loser: null })));
-        }
-
-        let newStruct = {
-            level: level,
-            bracket: bracket,
-            thirdPlaceMatch: { p1: null, p2: null, winner: null, loser: null }
-        };
-
-        // 填充第一輪
-        for (let i = 0; i < totalSlots; i += 2) {
-            const mIdx = i / 2;
-            const p1 = shuffled[i] || { name: "輪空", id: "BYE" };
-            const p2 = shuffled[i+1] || { name: "輪空", id: "BYE" };
-            newStruct.bracket[0][mIdx].p1 = p1;
-            newStruct.bracket[0][mIdx].p2 = p2;
-
-            if (p2.id === "BYE") {
-                newStruct.bracket[0][mIdx].winner = p1;
-                advanceLogic(newStruct, 0, mIdx, p1, null);
-            } else if (p1.id === "BYE") {
-                newStruct.bracket[0][mIdx].winner = p2;
-                advanceLogic(newStruct, 0, mIdx, p2, null);
+    document.getElementById('appTitle').addEventListener('click', () => {
+        clickCount++;
+        if (clickCount === 5) {
+            const pwd = prompt("請輸入管理員密碼：");
+            if (pwd === adminPassword) {
+                isAdmin = true;
+                document.body.classList.add('is-admin');
+                document.getElementById('adminStatus').style.display = 'block';
+                alert("管理員模式已開啟");
+                renderList(); // Re-render list to show edit buttons
             }
+            clickCount = 0;
         }
-        db.ref('tournaments/' + level).set(newStruct);
-    }
+    });
 
-    // 核心晉級邏輯
-    function advanceLogic(struct, rIdx, mIdx, winner, loser) {
-        const nextRound = rIdx + 1;
-        // 季軍賽：準決賽的輸家進入季軍賽
-        if (rIdx === struct.bracket.length - 2 && loser && loser.id !== "BYE") {
-            if (mIdx === 0) struct.thirdPlaceMatch.p1 = loser;
-            else struct.thirdPlaceMatch.p2 = loser;
-        }
-        // 晉級下一輪
-        if (nextRound < struct.bracket.length) {
-            const nextMIdx = Math.floor(mIdx / 2);
-            if (mIdx % 2 === 0) struct.bracket[nextRound][nextMIdx].p1 = winner;
-            else struct.bracket[nextRound][nextMIdx].p2 = winner;
-        }
-    }
-
-    function setWin(level, rIdx, mIdx, pNum) {
-        const struct = tournaments[level];
-        if (!struct || !struct.bracket) return;
-        const match = struct.bracket[rIdx][mIdx];
-        const winner = (pNum === 1) ? match.p1 : match.p2;
-        const loser = (pNum === 1) ? match.p2 : match.p1;
+    // --- Tab Switching ---
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         
-        match.winner = winner;
-        match.loser = loser;
-        advanceLogic(struct, rIdx, mIdx, winner, loser);
-        db.ref('tournaments/' + level).set(struct);
+        // Find the tab element based on the onclick attribute roughly or index
+        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
+        const index = tabs.indexOf(tabId);
+        document.querySelectorAll('.tab')[index].classList.add('active');
+        document.getElementById(tabId).classList.add('active');
     }
 
-    function setThirdWin(level, pNum) {
-        const struct = tournaments[level];
-        const match = struct.thirdPlaceMatch;
-        match.winner = (pNum === 1) ? match.p1 : match.p2;
-        match.loser = (pNum === 1) ? match.p2 : match.p1;
-        db.ref('tournaments/' + level).set(struct);
-    }
+    // --- Registration Logic ---
+    function submitRegistration() {
+        const name = document.getElementById('regName').value.trim();
+        const empId = document.getElementById('regEmpId').value.trim();
+        const category = document.getElementById('regCategory').value;
 
-    function renderAll() {
-        // 名單
-        const list = document.getElementById('regList');
-        list.innerHTML = participants.map(p => `<tr><td>${p.name}</td><td>${p.id}</td><td><span class="tag ${p.level==='入門'?'tag-entry':'tag-adv'}">${p.level}</span></td><td>${p.time}</td><td class="admin-only"><button onclick="deletePlayer('${p.fbKey}')" style="background:#e74c3c;color:white;">刪除</button></td></tr>`).join('');
+        if (!name || !empId) {
+            alert("請填寫完整資訊");
+            return;
+        }
 
-        ['入門', '進階'].forEach(lvl => {
-            const area = document.getElementById('area-' + lvl);
-            const struct = tournaments[lvl];
-            // 安全檢查：如果結構不對就不渲染
-            if (!struct || !struct.bracket) { area.style.display = 'none'; return; }
-            
-            area.style.display = 'block';
-            area.innerHTML = `<h3>🏆 ${lvl}組 賽程進度</h3>`;
-            
-            const bBox = document.createElement('div'); bBox.className = 'bracket-container';
-            struct.bracket.forEach((round, rIdx) => {
-                const rDiv = document.createElement('div'); rDiv.className = 'round';
-                rDiv.innerHTML = `<h4>第 ${rIdx+1} 輪</h4>`;
-                round.forEach((m, mIdx) => {
-                    rDiv.innerHTML += `
-                        <div class="matchup">
-                            <div class="slot ${m.winner?.id===m.p1?.id && m.winner ? 'winner-text' : ''}">
-                                <span>${m.p1 ? m.p1.name : '...'}</span>
-                                ${isAdmin && m.p1 && !m.winner && m.p1.id!=='BYE' ? `<button class="btn-win" onclick="setWin('${lvl}',${rIdx},${mIdx},1)">勝</button>` : ''}
-                            </div>
-                            <div class="slot ${m.winner?.id===m.p2?.id && m.winner ? 'winner-text' : ''}">
-                                <span>${m.p2 ? m.p2.name : '...'}</span>
-                                ${isAdmin && m.p2 && !m.winner && m.p2.id!=='BYE' ? `<button class="btn-win" onclick="setWin('${lvl}',${rIdx},${mIdx},2)">勝</button>` : ''}
-                            </div>
-                        </div>`;
-                });
-                bBox.appendChild(rDiv);
-            });
-            area.appendChild(bBox);
-
-            const tm = struct.thirdPlaceMatch;
-            if (tm && (tm.p1 || tm.p2)) {
-                const tBox = document.createElement('div'); tBox.style.cssText = "margin-top:20px; text-align:center;";
-                tBox.innerHTML = `
-                    <div style="background:#444; color:white; padding:15px; border-radius:8px; display:inline-block; width:260px; border:1px solid #e67e22;">
-                        <div style="font-size:12px; color:#e67e22; margin-bottom:5px;">🥉 季軍賽</div>
-                        <div class="slot ${tm.winner?.id===tm.p1?.id && tm.winner ? 'winner-text' : ''}"><span>${tm.p1?tm.p1.name:'...'}</span>${isAdmin&&tm.p1&&!tm.winner?`<button class="btn-win" onclick="setThirdWin('${lvl}',1)">勝</button>`:''}</div>
-                        <div class="slot ${tm.winner?.id===tm.p2?.id && tm.winner ? 'winner-text' : ''}"><span>${tm.p2?tm.p2.name:'...'}</span>${isAdmin&&tm.p2&&!tm.winner?`<button class="btn-win" onclick="setThirdWin('${lvl}',2)">勝</button>`:''}</div>
-                    </div>`;
-                area.appendChild(tBox);
-            }
-
-            const final = struct.bracket[struct.bracket.length-1][0];
-            if (final.winner && tm && tm.winner) {
-                const pBox = document.createElement('div'); pBox.className = 'podium-box';
-                pBox.innerHTML = `🥇 冠軍：${final.winner.name} | 🥈 亞軍：${final.loser.name}<br>🥉 季軍：${tm.winner.name} | 🏅 殿軍：${tm.loser.name}`;
-                area.appendChild(pBox);
-            }
+        const newUserRef = db.ref('users').push();
+        newUserRef.set({
+            name: name,
+            empId: empId,
+            category: category,
+            timestamp: new Date().toISOString()
+        }).then(() => {
+            alert("報名成功！");
+            document.getElementById('regName').value = '';
+            document.getElementById('regEmpId').value = '';
+            switchTab('list');
         });
     }
+
+    // --- List Logic ---
+    let allUsers = [];
+
+    db.ref('users').on('value', (snapshot) => {
+        const data = snapshot.val();
+        allUsers = [];
+        if (data) {
+            Object.keys(data).forEach(key => {
+                allUsers.push({ id: key, ...data[key] });
+            });
+        }
+        renderList();
+    });
+
+    function renderList() {
+        const tbody = document.getElementById('registrantsTable');
+        tbody.innerHTML = '';
+        
+        // Sort by timestamp desc
+        allUsers.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        allUsers.forEach(user => {
+            const dateStr = new Date(user.timestamp).toLocaleString('zh-TW');
+            const catStr = user.category === 'beginner' ? '入門' : '進階';
+            
+            let row = `<tr>
+                <td>${dateStr}</td>
+                <td>${catStr}</td>
+                <td>${isAdmin ? `<input class='edit-input' value='${user.name}' onchange='updateUser("${user.id}", "name", this.value)'>` : user.name}</td>
+                <td>${isAdmin ? `<input class='edit-input' value='${user.empId}' onchange='updateUser("${user.id}", "empId", this.value)'>` : user.empId}</td>
+                <td class="admin-action">
+                    <button class="danger" onclick="deleteUser('${user.id}')">刪除</button>
+                </td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function updateUser(id, field, value) {
+        db.ref('users/' + id).update({ [field]: value });
+    }
+
+    function deleteUser(id) {
+        if (confirm("確定要刪除這位報名者嗎？")) {
+            db.ref('users/' + id).remove();
+        }
+    }
+
+    // --- Bracket Logic ---
+
+    // Generate Bracket Structure
+    function generateBracket(category) {
+        if (!confirm("確定要重新產生對戰表嗎？這將清除目前的比賽進度！")) return;
+
+        // Filter users for this category
+        const participants = allUsers.filter(u => u.category === category).map(u => ({ name: u.name, id: u.id }));
+        
+        if (participants.length < 2) {
+            alert("人數不足，無法產生對戰表");
+            return;
+        }
+
+        // Shuffle
+        for (let i = participants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [participants[i], participants[j]] = [participants[j], participants[i]];
+        }
+
+        // Calculate size (power of 2)
+        let size = 1;
+        while (size < participants.length) size *= 2;
+
+        // Fill with Byes
+        const bracket = [];
+        for (let i = 0; i < size; i++) {
+            if (i < participants.length) {
+                bracket.push({ name: participants[i].name, id: participants[i].id });
+            } else {
+                bracket.push({ name: "輪空", id: "BYE" });
+            }
+        }
+
+        // Create Matches Structure
+        // We will store rounds. Round 0 is the first round.
+        // Round 0 has size/2 matches. Round 1 has size/4 matches...
+        
+        const rounds = [];
+        let currentRoundPlayers = bracket.map(p => ({...p})); // Clone
+
+        let roundCount = Math.log2(size);
+        
+        for (let r = 0; r < roundCount; r++) {
+            let matches = [];
+            let numMatches = currentRoundPlayers.length / 2;
+            
+            for (let m = 0; m < numMatches; m++) {
+                let p1 = currentRoundPlayers[m * 2];
+                let p2 = currentRoundPlayers[m * 2 + 1];
+                
+                let match = {
+                    p1: p1,
+                    p2: p2,
+                    winner: null // will be id
+                };
+
+                // Auto advance if BYE
+                if (p1.id === 'BYE') match.winner = p2.id;
+                else if (p2.id === 'BYE') match.winner = p1.id;
+
+                matches.push(match);
+            }
+            
+            rounds.push(matches);
+            
+            // Prepare next round placeholder
+            currentRoundPlayers = matches.map(() => ({ name: "TBD", id: null }));
+        }
+
+        // Save to Firebase
+        // Clear old data first to prevent issues
+        db.ref(`tournament/${category}`).set({
+            rounds: rounds,
+            thirdPlace: { p1: null, p2: null, winner: null }, // Initialize 3rd place match
+            timestamp: Date.now()
+        });
+    }
+
+    // Listener for Bracket Rendering
+    ['beginner', 'advanced'].forEach(cat => {
+        db.ref(`tournament/${cat}`).on('value', snapshot => {
+            const data = snapshot.val();
+            if (data) {
+                renderBracketUI(cat, data.rounds, data.thirdPlace);
+            } else {
+                document.getElementById(`${cat}-bracket-area`).innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>';
+                document.getElementById(`${cat}-3rd-place`).style.display = 'none';
+                document.getElementById(`${cat}-champion`).style.display = 'none';
+            }
+        });
+    });
+
+    function renderBracketUI(category, rounds, thirdPlaceData) {
+        const container = document.getElementById(`${category}-bracket-area`);
+        container.innerHTML = '';
+        
+        // Main Bracket
+        rounds.forEach((roundMatches, roundIndex) => {
+            const roundDiv = document.createElement('div');
+            roundDiv.className = 'round';
+            
+            roundMatches.forEach((match, matchIndex) => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'match';
+                
+                // Determine names (if previous round winner exists, use that)
+                // Logic: In rounds > 0, we need to look at previous round results
+                // However, our data structure saves the state in 'rounds', so we just read from it.
+                // But we need to ensure "TBD" names are updated if the data says so.
+                // Actually, the click handler updates the DB, so we just render what's in DB.
+                
+                // Logic check: If it's not Round 0, update names based on previous round winners
+                if (roundIndex > 0) {
+                    const prevRound = rounds[roundIndex - 1];
+                    const p1SourceMatch = prevRound[matchIndex * 2];
+                    const p2SourceMatch = prevRound[matchIndex * 2 + 1];
+
+                    // Update P1 info
+                    if (p1SourceMatch.winner) {
+                        const winnerObj = (p1SourceMatch.winner === p1SourceMatch.p1.id) ? p1SourceMatch.p1 : p1SourceMatch.p2;
+                        match.p1 = winnerObj;
+                    } else {
+                         match.p1 = { name: "等待中...", id: null };
+                    }
+
+                    // Update P2 info
+                    if (p2SourceMatch.winner) {
+                        const winnerObj = (p2SourceMatch.winner === p2SourceMatch.p1.id) ? p2SourceMatch.p1 : p2SourceMatch.p2;
+                        match.p2 = winnerObj;
+                    } else {
+                        match.p2 = { name: "等待中...", id: null };
+                    }
+                }
+
+                // Render Players
+                const p1Html = createPlayerHtml(match.p1, match.winner, category, roundIndex, matchIndex, 'p1');
+                const p2Html = createPlayerHtml(match.p2, match.winner, category, roundIndex, matchIndex, 'p2');
+                
+                matchDiv.innerHTML = p1Html + `<div style='border-top:1px solid #eee; margin:2px 0;'></div>` + p2Html;
+                roundDiv.appendChild(matchDiv);
+            });
+            
+            container.appendChild(roundDiv);
+        });
+
+        // 3rd Place & Champion Logic
+        const finalRoundIndex = rounds.length - 1;
+        const finalMatch = rounds[finalRoundIndex][0];
+        
+        // 1. Champion Display
+        const champDiv = document.getElementById(`${category}-champion`);
+        if (finalMatch.winner && finalMatch.winner !== 'BYE') {
+            const champion = (finalMatch.winner === finalMatch.p1.id) ? finalMatch.p1 : finalMatch.p2;
+            const runnerUp = (finalMatch.winner === finalMatch.p1.id) ? finalMatch.p2 : finalMatch.p1;
+            
+            champDiv.style.display = 'block';
+            champDiv.innerHTML = `<h3>🏆 冠軍：${champion.name}</h3><h4>🥈 亞軍：${runnerUp.name}</h4>`;
+        } else {
+            champDiv.style.display = 'none';
+        }
+
+        // 2. 3rd Place Logic
+        // Trigger: When Semi-Finals (Round N-1) are both done.
+        if (rounds.length >= 2) {
+            const semiRound = rounds[rounds.length - 2];
+            const semi1 = semiRound[0];
+            const semi2 = semiRound[1];
+
+            if (semi1.winner && semi2.winner) {
+                // Determine losers
+                const loser1 = (semi1.winner === semi1.p1.id) ? semi1.p2 : semi1.p1;
+                const loser2 = (semi2.winner === semi2.p1.id) ? semi2.p2 : semi2.p1;
+
+                if (loser1.id !== 'BYE' && loser2.id !== 'BYE') {
+                    // Update DB with 3rd place match players if not set
+                    // Warning: Avoid infinite loop. Only update if data is different.
+                    if ((!thirdPlaceData || thirdPlaceData.p1?.id !== loser1.id || thirdPlaceData.p2?.id !== loser2.id) && isAdmin) {
+                         // We only auto-set players, not winner
+                         // This is tricky in a render loop. Ideally, this should be done in the winHandler.
+                         // But for simplicity, we check equality roughly.
+                    }
+                    
+                    // Render 3rd Place Match
+                    const thirdContainer = document.getElementById(`${category}-3rd-place`);
+                    thirdContainer.style.display = 'block';
+                    const thirdMatchDiv = document.getElementById(`${category}-3rd-match`);
+                    
+                    // Construct a fake match object for rendering
+                    const p1 = loser1;
+                    const p2 = loser2;
+                    const winner = thirdPlaceData ? thirdPlaceData.winner : null;
+
+                    const tp1Html = createPlayerHtml(p1, winner, category, 'third', 0, 'p1');
+                    const tp2Html = createPlayerHtml(p2, winner, category, 'third', 0, 'p2');
+                    
+                    thirdMatchDiv.innerHTML = `<div class="match" style="width:200px;">${tp1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${tp2Html}</div>`;
+                    
+                    // Show 3rd/4th result if done
+                    if (winner) {
+                        const p3 = (winner === p1.id) ? p1.name : p2.name;
+                        const p4 = (winner === p1.id) ? p2.name : p1.name;
+                        champDiv.innerHTML += `<h4>🥉 季軍：${p3}</h4><h4>殿軍：${p4}</h4>`;
+                    }
+                }
+            }
+        }
+    }
+
+    function createPlayerHtml(player, matchWinnerId, category, rIdx, mIdx, slot) {
+        let classes = 'player';
+        if (matchWinnerId) {
+            if (matchWinnerId === player.id) classes += ' winner';
+            else classes += ' loser';
+        }
+        
+        let clickAction = '';
+        let editAction = '';
+        
+        // Edit Name feature for Admin
+        if (isAdmin && player.id && player.id !== 'BYE') {
+             // We allow editing name in the bracket for quick fixes, though it doesn't sync back to user list, only bracket.
+             // Simplification: Just show name.
+        }
+
+        // Set Winner Action
+        // Allows clicking if: Admin mode OR (Friendly mode - anyone can click). 
+        // User requested: "Opponent table can click win". Let's allow click to advance.
+        if (player.id && player.id !== 'BYE' && !matchWinnerId) {
+            clickAction = `onclick="setWinner('${category}', '${rIdx}', ${mIdx}, '${player.id}', '${slot}')"`;
+        }
+
+        return `<div class="${classes}" ${clickAction}>
+                    <span>${player.name || '-'}</span>
+                </div>`;
+    }
+
+    function setWinner(category, roundIdx, matchIdx, winnerId, slot) {
+        if (!confirm(`確認 ${winnerId === 'BYE' ? '輪空' : '該選手'} 獲勝嗎？`)) return;
+
+        if (roundIdx === 'third') {
+            // Handle 3rd place match
+            db.ref(`tournament/${category}/thirdPlace`).update({
+                winner: winnerId
+            });
+        } else {
+            // Handle standard bracket
+            roundIdx = parseInt(roundIdx);
+            
+            // 1. Update current match winner
+            db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({
+                winner: winnerId
+            });
+
+            // 2. Logic to handle "Next Round" population happens automatically in render 
+            // BUT we should ideally check if it's the semi-final to populate 3rd place
+            // Or if it's any round, ensure the next round exists.
+            
+            // Since our 'render' function calculates data dynamically based on previous rounds,
+            // strictly speaking, we don't NEED to write to the next round in DB if we calculate it on the fly.
+            // HOWEVER, my generate function created placeholders.
+            // Let's rely on the render logic visually, but the DB structure is `rounds`.
+            // The `rounds` array in DB is static. So when R0 finishes, R1 data in DB is still empty placeholders.
+            // We need to validly push the winner to the next round in the DB to make it persistent and editable.
+            
+            // Fetch current state to update next round
+            db.ref(`tournament/${category}`).once('value').then(snap => {
+                const data = snap.val();
+                const rounds = data.rounds;
+                
+                // If there is a next round
+                if (roundIdx + 1 < rounds.length) {
+                    const nextMatchIdx = Math.floor(matchIdx / 2);
+                    const nextSlot = (matchIdx % 2 === 0) ? 'p1' : 'p2';
+                    
+                    // Find who won (object)
+                    const currentMatch = rounds[roundIdx][matchIdx];
+                    const winnerObj = (currentMatch.p1.id === winnerId) ? currentMatch.p1 : currentMatch.p2;
+
+                    // Update next round
+                    db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set(winnerObj);
+                } else {
+                    // Final round finished
+                    // Trigger refresh to show champion
+                }
+
+                // Special Check: Are we in Semi-Finals? (Round N-2)
+                // rounds.length = Total rounds.
+                // If rounds.length = 3 (8 people). R0=Q, R1=Semi, R2=Final.
+                // If we just finished R1, populate 3rd place.
+                if (roundIdx === rounds.length - 2) {
+                     const currentMatch = rounds[roundIdx][matchIdx];
+                     const loserObj = (currentMatch.p1.id === winnerId) ? currentMatch.p2 : currentMatch.p1;
+                     
+                     // Need to figure out if we are match 0 or 1 in semi-final to put in p1 or p2 of 3rd place
+                     const thirdSlot = (matchIdx === 0) ? 'p1' : 'p2';
+                     db.ref(`tournament/${category}/thirdPlace/${thirdSlot}`).set(loserObj);
+                }
+            });
+        }
+    }
 </script>
+
 </body>
 </html>
