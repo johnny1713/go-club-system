@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圍棋社比賽報名與對戰系統</title>
+    <title>圍棋社比賽報名與對戰系統 (安全雜湊版)</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
@@ -41,7 +41,7 @@
 
         /* Admin Controls */
         .admin-controls-panel {
-            display: none; /* hidden by default */
+            display: none;
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
             padding: 15px;
@@ -65,6 +65,32 @@
         th { background-color: var(--primary); color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
 
+        /* Round Robin Grid Styles */
+        .rr-grid th, .rr-grid td { text-align: center; vertical-align: middle; padding: 15px; border: 1px solid #ccc; font-size: 1.1em; }
+        .rr-cell-self { background-color: #eee; }
+        .rr-cell-win { background-color: #d4edda; color: #155724; font-weight: bold; }
+        .rr-cell-loss { background-color: #f8d7da; color: #721c24; }
+        .rr-cell-play { background-color: #fff; color: #aaa; } 
+
+        /* 管理員互動樣式 */
+        body.is-admin .rr-cell-clickable { 
+            cursor: pointer !important; 
+            position: relative;
+        }
+        body.is-admin .rr-cell-clickable:hover { 
+            background-color: #ffeaa7 !important; 
+            outline: 2px solid var(--accent);
+            z-index: 10;
+        }
+
+        .rr-standings th { background-color: var(--accent); }
+        .rank-1 { color: gold; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        .rank-2 { color: silver; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        .rank-3 { color: #cd7f32; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        
+        .playoff-win-text { color: #d35400; font-weight: bold; font-size: 0.9em; }
+        .playoff-loss-text { color: #7f8c8d; font-size: 0.9em; }
+
         /* Tag Styles */
         .tag { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.9em; display: inline-block; font-weight: bold; text-align: center; min-width: 60px;}
         .tag-beginner { background-color: #27ae60; }
@@ -79,7 +105,7 @@
         
         body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
         body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; }
-
+        
         /* Bracket Styles */
         .bracket-container { display: flex; overflow-x: auto; padding: 20px 0; min-height: 400px; }
         .round { display: flex; flex-direction: column; justify-content: space-around; min-width: 200px; margin-right: 40px; }
@@ -100,6 +126,11 @@
         }
         .edit-input { width: 100px; padding: 2px; }
         .admin-select { width: auto; padding: 5px; border-color: var(--accent); }
+        
+        /* Playoff Section */
+        .playoff-area { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .playoff-controls { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; display: none; }
+        body.is-admin .playoff-controls { display: block; }
     </style>
 </head>
 <body>
@@ -108,7 +139,7 @@
     <h1 id="appTitle" title="圍棋社內部比賽系統">圍棋社內部比賽系統</h1>
     <div id="adminStatus" style="text-align:center; color: red; display:none;">
         (管理員模式已啟用)<br>
-        <span style="font-size:0.8em; color:#666;">💡 提示：點擊名字判定勝負 / 點擊「綠色獲勝者」可取消勝負</span><br>
+        <span style="font-size:0.8em; color:#666;">💡 提示：循環賽請直接點擊「表格中的格子」切換勝負</span><br>
         <button class="logout-btn" onclick="logout()">登出管理員</button>
     </div>
 
@@ -121,7 +152,6 @@
 
     <div id="register" class="tab-content active">
         <h2>選手報名</h2>
-        
         <div class="admin-controls-panel">
             <strong>🔧 管理員控制：</strong>
             <button class="success" onclick="toggleRegistration(true)">🟢 開啟報名</button>
@@ -133,8 +163,8 @@
             <div class="form-group">
                 <label>組別</label>
                 <select id="regCategory">
-                    <option value="beginner">入門組</option>
-                    <option value="advanced">進階組</option>
+                    <option value="beginner">入門組 (單淘汰)</option>
+                    <option value="advanced">進階組 (循環賽)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -171,10 +201,10 @@
 
     <div id="bracket-beginner" class="tab-content">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>入門組 對戰表</h2>
+            <h2>入門組 對戰表 (單敗淘汰)</h2>
             <div>
                 <button class="admin-btn danger" onclick="clearBracket('beginner')">🗑️ 清空對戰表</button>
-                <button class="admin-btn" onclick="generateBracket('beginner')">重新產生對戰表</button>
+                <button class="admin-btn" onclick="generateBracket('beginner')">重新產生</button>
             </div>
         </div>
         <div id="beginner-bracket-area" class="bracket-container"></div>
@@ -187,23 +217,55 @@
 
     <div id="bracket-advanced" class="tab-content">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>進階組 對戰表</h2>
+            <h2>進階組 對戰表 (循環賽)</h2>
             <div>
                 <button class="admin-btn danger" onclick="clearBracket('advanced')">🗑️ 清空對戰表</button>
-                <button class="admin-btn" onclick="generateBracket('advanced')">重新產生對戰表</button>
+                <button class="admin-btn" onclick="generateBracket('advanced')">重新產生</button>
             </div>
         </div>
-        <div id="advanced-bracket-area" class="bracket-container"></div>
-        <div id="advanced-3rd-place" class="third-place-container" style="display:none;">
-            <div class="third-place-title">季殿軍賽</div>
-            <div id="advanced-3rd-match"></div>
+        
+        <h3>🏆 戰績排行榜</h3>
+        <table class="rr-standings">
+            <thead>
+                <tr>
+                    <th>名次</th>
+                    <th>姓名</th>
+                    <th>勝</th>
+                    <th>敗</th>
+                    <th>勝率</th>
+                    <th>備註</th>
+                </tr>
+            </thead>
+            <tbody id="advanced-standings-body"></tbody>
+        </table>
+
+        <h3>⚔️ 對戰矩陣</h3>
+        <p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。若您是管理員，請點擊格子切換：勝 -> 敗 -> 未戰)</p>
+        <div id="advanced-grid-area" style="overflow-x: auto;"></div>
+
+        <div class="playoff-area">
+            <h3>🔥 加賽區 (平手時使用)</h3>
+            <div class="playoff-controls">
+                <label>新增加賽場次：</label>
+                <select id="playoffP1"></select> VS <select id="playoffP2"></select>
+                <button onclick="addPlayoffMatch()">新增場次</button>
+            </div>
+            <div id="advanced-playoff-matches" class="bracket-container" style="min-height: auto;"></div>
         </div>
-        <div id="advanced-champion" class="champion-box"></div>
     </div>
 </div>
 
 <script>
-    // Firebase Config
+    // 1. 初始化變數
+    let clickCount = 0;
+    let isAdmin = false;
+    let isRegistrationOpen = true; 
+    let allUsers = [];
+    let cacheBeginnerData = null;
+    let cacheAdvancedData = null;
+    
+    const targetHash = "43b2d122712ab1d4778f7d4ff86337f7c9aeb6d5e3ac0d0626e7288258f6a836";
+
     const firebaseConfig = {
         apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
         authDomain: "go-club-818e2.firebaseapp.com",
@@ -218,18 +280,25 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // --- Admin Logic ---
-    let clickCount = 0;
-    let isAdmin = false;
-    // SHA-256 雜湊值
-    const targetHash = "43b2d122712ab1d4778f7d4ff86337f7c9aeb6d5e3ac0d0626e7288258f6a836"; 
-
-    // Check persistence
+    // 2. 啟動邏輯
     if (localStorage.getItem('goClubAdmin') === 'true') {
         enableAdminMode();
     }
 
+    db.ref('config/registrationOpen').on('value', (snapshot) => {
+        const val = snapshot.val();
+        isRegistrationOpen = (val === null) ? true : val;
+        updateRegistrationUI();
+    });
+
+    // 3. 管理員功能 (含 Hash 驗證)
+    
     async function sha256(message) {
+        // 檢查瀏覽器是否支援
+        if (!window.crypto || !window.crypto.subtle) {
+            alert("⚠️ 安全警告：您的瀏覽器或執行環境 (如直接開啟 file://) 不支援加密功能。\n無法驗證密碼，請使用 Local Server 開啟網頁。");
+            throw new Error("Crypto API not available");
+        }
         const msgBuffer = new TextEncoder().encode(message);
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -239,17 +308,21 @@
 
     document.getElementById('appTitle').addEventListener('click', async () => {
         clickCount++;
-        if (clickCount === 32) {
+        if (clickCount === 16) {
             if (isAdmin) return; 
             
             const pwd = prompt("請輸入管理員密碼：");
             if (pwd) {
-                const inputHash = await sha256(pwd);
-                if (inputHash === targetHash) {
-                    enableAdminMode();
-                    alert("管理員模式已開啟");
-                } else {
-                    alert("密碼錯誤");
+                try {
+                    const inputHash = await sha256(pwd);
+                    if (inputHash === targetHash) {
+                        enableAdminMode();
+                        alert("管理員模式已開啟");
+                    } else {
+                        alert("密碼錯誤");
+                    }
+                } catch (e) {
+                    console.error("Hash Error:", e);
                 }
             }
             clickCount = 0;
@@ -261,11 +334,9 @@
         localStorage.setItem('goClubAdmin', 'true');
         document.body.classList.add('is-admin');
         document.getElementById('adminStatus').style.display = 'block';
-        updateRegistrationUI(); // Refresh UI with admin privileges
-        
+        updateRegistrationUI();
         renderList();
-        if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
-        if(cacheAdvancedData) renderBracketUI('advanced', cacheAdvancedData.rounds, cacheAdvancedData.thirdPlace);
+        refreshBrackets(); 
     }
 
     function logout() {
@@ -273,32 +344,10 @@
         localStorage.removeItem('goClubAdmin');
         document.body.classList.remove('is-admin');
         document.getElementById('adminStatus').style.display = 'none';
-        updateRegistrationUI(); // Refresh UI to hide admin controls
-        
-        renderList();
-        if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData.rounds, cacheBeginnerData.thirdPlace);
-        if(cacheAdvancedData) renderBracketUI('advanced', cacheAdvancedData.rounds, cacheAdvancedData.thirdPlace);
-    }
-
-    // --- Tab Switching ---
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
-        const index = tabs.indexOf(tabId);
-        document.querySelectorAll('.tab')[index].classList.add('active');
-        document.getElementById(tabId).classList.add('active');
-    }
-
-    // --- Registration Status Logic ---
-    let isRegistrationOpen = true; // Default
-
-    // Listen to Firebase for status changes
-    db.ref('config/registrationOpen').on('value', (snapshot) => {
-        const val = snapshot.val();
-        isRegistrationOpen = (val === null) ? true : val; // Default to true if not set
         updateRegistrationUI();
-    });
+        renderList();
+        refreshBrackets(); 
+    }
 
     function toggleRegistration(status) {
         db.ref('config/registrationOpen').set(status);
@@ -310,14 +359,9 @@
         const closedMsg = document.getElementById('regClosedMsg');
         const adminStatusLabel = document.getElementById('adminRegStatus');
         
-        // Admin Label Update
         adminStatusLabel.innerText = isRegistrationOpen ? "(目前狀態：開啟)" : "(目前狀態：截止)";
         adminStatusLabel.style.color = isRegistrationOpen ? "green" : "red";
 
-        // Logic:
-        // If Admin: Always see form (to help ppl sign up manually) + see controls
-        // If User: Only see form if Open. If Closed, see message.
-        
         if (isAdmin) {
             formDiv.style.display = 'block';
             closedMsg.style.display = 'none';
@@ -332,9 +376,22 @@
         }
     }
 
-    // --- Registration Logic ---
+    function refreshBrackets() {
+        if(cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData);
+        if(cacheAdvancedData) renderAdvancedUI(cacheAdvancedData);
+    }
+
+    // 4. 一般功能
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
+        const index = tabs.indexOf(tabId);
+        document.querySelectorAll('.tab')[index].classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
     function submitRegistration() {
-        // Double check client side (rule of thumb)
         if (!isRegistrationOpen && !isAdmin) {
             alert("抱歉，報名已截止。");
             return;
@@ -368,9 +425,6 @@
             switchTab('list');
         });
     }
-
-    // --- List Logic ---
-    let allUsers = [];
 
     db.ref('users').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -429,12 +483,9 @@
         }
     }
 
-    // --- Bracket Logic ---
-
-    // New Function: Clear Bracket Only
+    // 5. 對戰表生成
     function clearBracket(category) {
         if (!confirm(`確定要清空【${category === 'beginner' ? '入門組' : '進階組'}】的對戰表嗎？\n(報名資料會保留)`)) return;
-        
         db.ref(`tournament/${category}`).remove().then(() => {
             alert("對戰表已清空");
         });
@@ -450,7 +501,14 @@
             return;
         }
 
-        // Shuffle
+        if (category === 'advanced') {
+            generateRoundRobin(participants);
+        } else {
+            generateElimination(participants);
+        }
+    }
+
+    function generateElimination(participants) {
         for (let i = participants.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [participants[i], participants[j]] = [participants[j], participants[i]];
@@ -463,20 +521,13 @@
         const numMatches = size / 2;
 
         let byePriority = [];
-        if (numMatches === 16) { 
-            byePriority = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
-        } else if (numMatches === 8) { 
-            byePriority = [0, 7, 4, 3, 2, 5, 6, 1];
-        } else if (numMatches === 4) { 
-            byePriority = [0, 3, 2, 1];
-        } else {
-             for(let i=0; i<numMatches; i++) byePriority.push(i);
-        }
+        if (numMatches === 16) byePriority = [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1];
+        else if (numMatches === 8) byePriority = [0, 7, 4, 3, 2, 5, 6, 1];
+        else if (numMatches === 4) byePriority = [0, 3, 2, 1];
+        else for(let i=0; i<numMatches; i++) byePriority.push(i);
 
         const round1Matches = [];
-        for (let i = 0; i < numMatches; i++) {
-            round1Matches.push({ p1: null, p2: null, winner: null });
-        }
+        for (let i = 0; i < numMatches; i++) round1Matches.push({ p1: null, p2: null, winner: null });
 
         const matchesWithBye = new Set(byePriority.slice(0, numByes));
 
@@ -498,41 +549,76 @@
         let nextSize = numMatches / 2;
         while (nextSize >= 1) {
             let nextRound = [];
-            for (let i = 0; i < nextSize; i++) {
-                nextRound.push({ p1: {name: "TBD", id:null}, p2: {name: "TBD", id:null}, winner: null });
-            }
+            for (let i = 0; i < nextSize; i++) nextRound.push({ p1: {name: "TBD", id:null}, p2: {name: "TBD", id:null}, winner: null });
             rounds.push(nextRound);
             nextSize /= 2;
         }
 
-        db.ref(`tournament/${category}`).set({
+        db.ref(`tournament/beginner`).set({
+            type: 'elimination',
             rounds: rounds,
             thirdPlace: { p1: null, p2: null, winner: null },
             timestamp: Date.now()
         });
     }
 
-    // Cache Data
-    let cacheBeginnerData = null;
-    let cacheAdvancedData = null;
-
-    ['beginner', 'advanced'].forEach(cat => {
-        db.ref(`tournament/${cat}`).on('value', snapshot => {
-            const data = snapshot.val();
-            if(cat === 'beginner') cacheBeginnerData = data;
-            else cacheAdvancedData = data;
-
-            if (data) {
-                renderBracketUI(cat, data.rounds, data.thirdPlace);
-            } else {
-                document.getElementById(`${cat}-bracket-area`).innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>';
-                document.getElementById(`${cat}-3rd-place`).style.display = 'none';
-                document.getElementById(`${cat}-champion`).style.display = 'none';
+    function generateRoundRobin(participants) {
+        let matches = [];
+        for (let i = 0; i < participants.length; i++) {
+            for (let j = i + 1; j < participants.length; j++) {
+                matches.push({
+                    p1: participants[i],
+                    p2: participants[j],
+                    winner: null
+                });
             }
+        }
+
+        db.ref(`tournament/advanced`).set({
+            type: 'round-robin',
+            participants: participants,
+            matches: matches,
+            playoffs: [], 
+            timestamp: Date.now()
         });
+    }
+
+    // 6. 渲染邏輯
+    db.ref('tournament/beginner').on('value', snapshot => {
+        cacheBeginnerData = snapshot.val();
+        try {
+            if (cacheBeginnerData) renderBracketUI('beginner', cacheBeginnerData);
+            else clearUI('beginner');
+        } catch (e) {
+            console.error("Beginner Render Error:", e);
+        }
     });
 
-    function renderBracketUI(category, rounds, thirdPlaceData) {
+    db.ref('tournament/advanced').on('value', snapshot => {
+        cacheAdvancedData = snapshot.val();
+        try {
+            if (cacheAdvancedData) renderAdvancedUI(cacheAdvancedData);
+            else clearUI('advanced');
+        } catch (e) {
+            console.error("Advanced Render Error:", e);
+            document.getElementById(`advanced-grid-area`).innerHTML = '<p style="padding:20px; color:red;">⚠️ 資料格式不符</p>';
+        }
+    });
+
+    function clearUI(category) {
+        if(category === 'beginner') {
+            document.getElementById(`beginner-bracket-area`).innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>';
+            document.getElementById(`beginner-3rd-place`).style.display = 'none';
+            document.getElementById(`beginner-champion`).style.display = 'none';
+        } else {
+            document.getElementById(`advanced-grid-area`).innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>';
+            document.getElementById(`advanced-standings-body`).innerHTML = '';
+        }
+    }
+
+    function renderBracketUI(category, data) {
+        if(data.type !== 'elimination' && data.rounds === undefined) return;
+        const rounds = data.rounds;
         const container = document.getElementById(`${category}-bracket-area`);
         container.innerHTML = '';
         
@@ -549,17 +635,11 @@
                     const p1Match = prevRound[matchIndex * 2];
                     const p2Match = prevRound[matchIndex * 2 + 1];
 
-                    if (p1Match && p1Match.winner) {
-                        match.p1 = (p1Match.winner === p1Match.p1.id) ? p1Match.p1 : p1Match.p2;
-                    } else {
-                        match.p1 = { name: "等待中...", id: null };
-                    }
+                    if (p1Match && p1Match.winner) match.p1 = (p1Match.winner === p1Match.p1.id) ? p1Match.p1 : p1Match.p2;
+                    else match.p1 = { name: "等待中...", id: null };
 
-                    if (p2Match && p2Match.winner) {
-                        match.p2 = (p2Match.winner === p2Match.p1.id) ? p2Match.p1 : p2Match.p2;
-                    } else {
-                        match.p2 = { name: "等待中...", id: null };
-                    }
+                    if (p2Match && p2Match.winner) match.p2 = (p2Match.winner === p2Match.p1.id) ? p2Match.p1 : p2Match.p2;
+                    else match.p2 = { name: "等待中...", id: null };
                 }
 
                 const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, category, roundIndex, matchIndex, 'p1');
@@ -568,7 +648,6 @@
                 matchDiv.innerHTML = p1Html + `<div style='border-top:1px solid #eee; margin:2px 0;'></div>` + p2Html;
                 roundDiv.appendChild(matchDiv);
             });
-            
             container.appendChild(roundDiv);
         });
 
@@ -601,13 +680,13 @@
                     
                     const p1 = loser1;
                     const p2 = loser2;
-                    const winner = thirdPlaceData ? thirdPlaceData.winner : null;
+                    const winner = data.thirdPlace ? data.thirdPlace.winner : null;
 
                     const tp1Html = createPlayerHtml(p1, p2, winner, category, 'third', 0, 'p1');
                     const tp2Html = createPlayerHtml(p2, p1, winner, category, 'third', 0, 'p2');
-                    
                     thirdMatchDiv.innerHTML = `<div class="match" style="width:200px;">${tp1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${tp2Html}</div>`;
                     
+                    // 修復季殿軍顯示
                     if (winner) {
                         const p3 = (winner === p1.id) ? p1.name : p2.name;
                         const p4 = (winner === p1.id) ? p2.name : p1.name;
@@ -618,45 +697,239 @@
         }
     }
 
+    function renderAdvancedUI(data) {
+        if (data.type !== 'round-robin') {
+            document.getElementById(`advanced-grid-area`).innerHTML = '<div style="text-align:center; padding:20px; color:red;">⚠️ 資料格式不符</div>';
+            return;
+        }
+
+        const participants = data.participants || [];
+        const matches = data.matches || [];
+        const playoffs = data.playoffs || [];
+
+        // 1. 積分計算 (包含加賽紀錄標記)
+        const stats = {};
+        participants.forEach(p => stats[p.id] = { 
+            name: p.name, 
+            wins: 0, 
+            losses: 0, 
+            id: p.id,
+            playoffStatus: null // 'win' or 'loss' or null
+        });
+
+        matches.forEach(m => {
+            if (m.winner) {
+                stats[m.winner].wins++;
+                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
+                stats[loserId].losses++;
+            }
+        });
+
+        // 標記加賽結果
+        playoffs.forEach(m => {
+            if(m.winner) {
+                if(stats[m.winner]) stats[m.winner].playoffStatus = 'win';
+                
+                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
+                if(stats[loserId]) stats[loserId].playoffStatus = 'loss';
+            }
+        });
+
+        // 排序邏輯：勝場 > 敗場 > 加賽對戰結果
+        const sortedStats = Object.values(stats).sort((a, b) => {
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            if (a.losses !== b.losses) return a.losses - b.losses;
+
+            // 3. 平手！檢查加賽紀錄
+            const playoffMatch = playoffs.find(m => 
+                (m.p1.id === a.id && m.p2.id === b.id) || 
+                (m.p1.id === b.id && m.p2.id === a.id)
+            );
+
+            if (playoffMatch && playoffMatch.winner) {
+                return (playoffMatch.winner === a.id) ? -1 : 1;
+            }
+
+            return 0;
+        });
+
+        const standingsBody = document.getElementById('advanced-standings-body');
+        standingsBody.innerHTML = '';
+        sortedStats.forEach((s, idx) => {
+            let rankClass = '';
+            if (idx === 0) rankClass = 'rank-1';
+            if (idx === 1) rankClass = 'rank-2';
+            if (idx === 2) rankClass = 'rank-3';
+            
+            const totalGames = s.wins + s.losses;
+            const winRate = totalGames > 0 ? Math.round((s.wins / totalGames) * 100) + '%' : '-';
+
+            let note = '';
+            if(s.playoffStatus === 'win') note = '<span class="playoff-win-text">🔥 加賽勝</span>';
+            if(s.playoffStatus === 'loss') note = '<span class="playoff-loss-text">💀 加賽敗</span>';
+
+            standingsBody.innerHTML += `
+                <tr>
+                    <td class="${rankClass}">#${idx + 1}</td>
+                    <td>${s.name}</td>
+                    <td>${s.wins}</td>
+                    <td>${s.losses}</td>
+                    <td>${winRate}</td>
+                    <td>${note}</td>
+                </tr>
+            `;
+        });
+
+        // 2. Grid (Cross Table)
+        const gridArea = document.getElementById('advanced-grid-area');
+        let gridHtml = '<table class="rr-grid" border="1" style="border-collapse:collapse; width:100%; min-width:600px;">';
+        
+        gridHtml += '<tr><th style="background:#eee;">選手</th>';
+        participants.forEach(p => gridHtml += `<th style="background:#eee;">${p.name}</th>`);
+        gridHtml += '</tr>';
+
+        participants.forEach((rowP, i) => {
+            gridHtml += `<tr><td style="font-weight:bold; background:#fafafa;">${rowP.name}</td>`;
+            participants.forEach((colP, j) => {
+                if (rowP.id === colP.id) {
+                    gridHtml += '<td class="rr-cell-self"></td>';
+                } else {
+                    const matchIndex = matches.findIndex(m => 
+                        (m.p1.id === rowP.id && m.p2.id === colP.id) || 
+                        (m.p1.id === colP.id && m.p2.id === rowP.id)
+                    );
+                    
+                    if (matchIndex === -1) {
+                        gridHtml += '<td>Error</td>';
+                    } else {
+                        const match = matches[matchIndex];
+                        let cellContent = '-';
+                        let cellClass = '';
+                        
+                        let onClick = isAdmin ? `onclick="window.toggleRRWinner(${matchIndex}, '${rowP.id}')"` : '';
+
+                        if (match.winner) {
+                            if (match.winner === rowP.id) {
+                                cellContent = '勝';
+                                cellClass = 'rr-cell-win';
+                            } else {
+                                cellContent = '敗';
+                                cellClass = 'rr-cell-loss';
+                            }
+                        } else {
+                            cellContent = '未戰';
+                            cellClass = 'rr-cell-play';
+                        }
+                        
+                        if (isAdmin) {
+                            cellClass += ' rr-cell-clickable';
+                        }
+
+                        gridHtml += `<td class="${cellClass}" ${onClick}>${cellContent}</td>`;
+                    }
+                }
+            });
+            gridHtml += '</tr>';
+        });
+        gridHtml += '</table>';
+        gridArea.innerHTML = gridHtml;
+
+        // 3. Playoff Dropdowns
+        const p1Select = document.getElementById('playoffP1');
+        const p2Select = document.getElementById('playoffP2');
+        if (p1Select.options.length === 0) { 
+            p1Select.innerHTML = '';
+            p2Select.innerHTML = '';
+            participants.forEach(p => {
+                p1Select.add(new Option(p.name, JSON.stringify(p)));
+                p2Select.add(new Option(p.name, JSON.stringify(p)));
+            });
+        }
+
+        // 4. Render Playoffs
+        const playoffContainer = document.getElementById('advanced-playoff-matches');
+        playoffContainer.innerHTML = '';
+        if (playoffs.length > 0) {
+            playoffs.forEach((match, idx) => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'match';
+                matchDiv.style.margin = '5px 10px';
+                
+                const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, 'advanced', 'playoff', idx, 'p1');
+                const p2Html = createPlayerHtml(match.p2, match.p1, match.winner, 'advanced', 'playoff', idx, 'p2');
+                let delBtn = isAdmin ? `<button onclick="deletePlayoff(${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
+
+                matchDiv.innerHTML = `${delBtn}${p1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${p2Html}`;
+                playoffContainer.appendChild(matchDiv);
+            });
+        }
+    }
+
+    // 7. 互動操作
     function createPlayerHtml(player, opponent, matchWinnerId, category, rIdx, mIdx, slot) {
         let classes = 'player';
         if (player.id === 'BYE') classes += ' bye-text';
-        
         if (matchWinnerId) {
             if (matchWinnerId === player.id) classes += ' winner';
             else classes += ' loser';
         }
-
         let clickAction = '';
-        
         if (isAdmin) {
-            const opponentId = opponent ? opponent.id : null;
-            if (!matchWinnerId && player.id && player.id !== 'BYE' && opponentId) {
-                classes += ' clickable';
-                clickAction = `onclick="setWinner('${category}', '${rIdx}', ${mIdx}, '${player.id}')"`;
-            }
-            else if (matchWinnerId && matchWinnerId === player.id && opponentId !== 'BYE') {
-                classes += ' undoable';
-                clickAction = `onclick="resetMatch('${category}', '${rIdx}', ${mIdx})"`;
+            if (rIdx === 'playoff') {
+                if (!matchWinnerId || (matchWinnerId === player.id)) {
+                     classes += ' clickable';
+                     clickAction = `onclick="setPlayoffWinner(${mIdx}, '${player.id}')"`;
+                }
+            } else {
+                const opponentId = opponent ? opponent.id : null;
+                if (!matchWinnerId && player.id && player.id !== 'BYE' && opponentId) {
+                    classes += ' clickable';
+                    clickAction = `onclick="setWinner('${category}', '${rIdx}', ${mIdx}, '${player.id}')"`;
+                } else if (matchWinnerId && matchWinnerId === player.id && opponentId !== 'BYE') {
+                    classes += ' undoable';
+                    clickAction = `onclick="resetMatch('${category}', '${rIdx}', ${mIdx})"`;
+                }
             }
         }
-
         return `<div class="${classes}" ${clickAction}><span>${player.name || '-'}</span></div>`;
     }
 
+    window.toggleRRWinner = function(matchIndex, clickedPlayerId) {
+        if (!isAdmin) return;
+
+        console.log(`Grid Clicked: ${matchIndex}, Player: ${clickedPlayerId}`);
+
+        if (!cacheAdvancedData || !cacheAdvancedData.matches) {
+            console.error("No match data found");
+            return;
+        }
+
+        const match = cacheAdvancedData.matches[matchIndex];
+        let newWinner = null;
+
+        if (!match.winner) {
+            newWinner = clickedPlayerId;
+        } else if (match.winner === clickedPlayerId) {
+            newWinner = (match.p1.id === clickedPlayerId) ? match.p2.id : match.p1.id;
+        } else {
+            newWinner = null;
+        }
+
+        db.ref(`tournament/advanced/matches/${matchIndex}`).update({ winner: newWinner })
+            .then(() => console.log("Update Success"))
+            .catch(err => alert("Update Error: " + err.message));
+    };
+
     function setWinner(category, roundIdx, matchIdx, winnerId) {
         if (!confirm("確認該選手獲勝嗎？")) return;
-
         if (roundIdx === 'third') {
             db.ref(`tournament/${category}/thirdPlace`).update({ winner: winnerId });
         } else {
             roundIdx = parseInt(roundIdx);
             db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({ winner: winnerId });
-
             db.ref(`tournament/${category}`).once('value').then(snap => {
                 const data = snap.val();
                 const rounds = data.rounds;
-                
                 if (roundIdx + 1 < rounds.length) {
                     const nextMatchIdx = Math.floor(matchIdx / 2);
                     const nextSlot = (matchIdx % 2 === 0) ? 'p1' : 'p2';
@@ -664,7 +937,6 @@
                     const winnerObj = (currentMatch.p1.id === winnerId) ? currentMatch.p1 : currentMatch.p2;
                     db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set(winnerObj);
                 }
-                
                 if (roundIdx === rounds.length - 2) {
                      const currentMatch = rounds[roundIdx][matchIdx];
                      const loserObj = (currentMatch.p1.id === winnerId) ? currentMatch.p2 : currentMatch.p1;
@@ -677,41 +949,50 @@
 
     function resetMatch(category, roundIdx, matchIdx) {
         if (!confirm("⚠️ 確定要取消此局勝負嗎？\n(這會將此局重置為未對戰狀態)")) return;
-
-        if (roundIdx === 'third') {
-             db.ref(`tournament/${category}/thirdPlace`).update({ winner: null });
-             return;
-        }
-
+        if (roundIdx === 'third') { db.ref(`tournament/${category}/thirdPlace`).update({ winner: null }); return; }
         roundIdx = parseInt(roundIdx);
-        
         db.ref(`tournament/${category}`).once('value').then(snap => {
             const data = snap.val();
             const rounds = data.rounds;
-
             if (roundIdx + 1 < rounds.length) {
                 const nextMatchIdx = Math.floor(matchIdx / 2);
-                const nextMatch = rounds[roundIdx + 1][nextMatchIdx];
-                if (nextMatch.winner) {
-                    alert("🚫 無法取消：該選手已在下一輪完成比賽。\n請先取消下一輪的勝負。");
-                    return;
-                }
+                if (rounds[roundIdx + 1][nextMatchIdx].winner) { alert("🚫 無法取消：下一輪已有比賽結果。"); return; }
             }
-
             db.ref(`tournament/${category}/rounds/${roundIdx}/${matchIdx}`).update({ winner: null });
-
             if (roundIdx + 1 < rounds.length) {
                 const nextMatchIdx = Math.floor(matchIdx / 2);
                 const nextSlot = (matchIdx % 2 === 0) ? 'p1' : 'p2';
                 db.ref(`tournament/${category}/rounds/${roundIdx + 1}/${nextMatchIdx}/${nextSlot}`).set({ name: "TBD", id: null });
             }
-
             if (roundIdx === rounds.length - 2) {
                  const thirdSlot = (matchIdx === 0) ? 'p1' : 'p2';
                  db.ref(`tournament/${category}/thirdPlace/${thirdSlot}`).set({ name: "TBD", id: null });
                  db.ref(`tournament/${category}/thirdPlace`).update({ winner: null });
             }
         });
+    }
+
+    function addPlayoffMatch() {
+        const p1Data = JSON.parse(document.getElementById('playoffP1').value);
+        const p2Data = JSON.parse(document.getElementById('playoffP2').value);
+        if (p1Data.id === p2Data.id) { alert("不能選擇同一人對戰"); return; }
+        let playoffs = cacheAdvancedData.playoffs || [];
+        playoffs.push({ p1: p1Data, p2: p2Data, winner: null });
+        db.ref(`tournament/advanced/playoffs`).set(playoffs);
+    }
+
+    function setPlayoffWinner(matchIdx, winnerId) {
+        const match = cacheAdvancedData.playoffs[matchIdx];
+        let newWinner = winnerId;
+        if (match.winner === winnerId) newWinner = null;
+        db.ref(`tournament/advanced/playoffs/${matchIdx}`).update({ winner: newWinner });
+    }
+
+    function deletePlayoff(idx) {
+        if(!confirm("確定刪除這場加賽？")) return;
+        let playoffs = cacheAdvancedData.playoffs;
+        playoffs.splice(idx, 1);
+        db.ref(`tournament/advanced/playoffs`).set(playoffs);
     }
 </script>
 
