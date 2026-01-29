@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圍棋社比賽系統 (瑞士制防呆版)</title>
+    <title>圍棋社比賽系統 (循環賽平手解決版)</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
@@ -69,7 +69,6 @@
         /* Admin Interaction Styles */
         body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
         body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; }
-        /* Disabled interaction for old rounds */
         body.is-admin .player.locked { cursor: not-allowed; opacity: 0.6; }
 
         /* Swiss Round Section */
@@ -80,6 +79,9 @@
         .rank-1 { color: gold; font-weight: bold; text-shadow: 1px 1px 0 #999; }
         .rank-2 { color: silver; font-weight: bold; text-shadow: 1px 1px 0 #999; }
         .rank-3 { color: #cd7f32; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        
+        .playoff-win-text { color: #d35400; font-weight: bold; font-size: 0.9em; }
+        .playoff-loss-text { color: #7f8c8d; font-size: 0.9em; }
 
         /* Tag Styles */
         .tag { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.9em; display: inline-block; font-weight: bold; text-align: center; min-width: 60px;}
@@ -102,6 +104,11 @@
         body.is-admin .rr-cell-clickable { cursor: pointer !important; position: relative; }
         body.is-admin .rr-cell-clickable:hover { background-color: #ffeaa7 !important; outline: 2px solid var(--accent); z-index: 10; }
 
+        /* Playoff Section */
+        .playoff-area { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .playoff-controls { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; display: none; }
+        body.is-admin .playoff-controls { display: block; }
+
         .edit-input { width: 100px; padding: 2px; }
         .admin-select { width: auto; padding: 5px; border-color: var(--accent); }
     </style>
@@ -112,7 +119,7 @@
     <h1 id="appTitle" title="圍棋社內部比賽系統">圍棋社內部比賽系統</h1>
     <div id="adminStatus" style="text-align:center; color: red; display:none;">
         (管理員模式已啟用)<br>
-        <span style="font-size:0.8em; color:#666;">💡 提示：點擊「格子」或「名字」切換勝負 (歷史輪次會鎖定)</span><br>
+        <span style="font-size:0.8em; color:#666;">💡 提示：點擊「格子」或「名字」切換勝負</span><br>
         <button class="logout-btn" onclick="logout()">登出管理員</button>
     </div>
 
@@ -183,7 +190,7 @@
         </div>
         
         <p style="color:#666; font-size:0.9em; margin:10px 0;">
-            💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」回到該輪次。
+            💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。
         </p>
 
         <div id="beginner-swiss-rounds"></div>
@@ -207,6 +214,7 @@
         </div>
         
         <h3>🏆 進階組 戰績排行榜</h3>
+        <p style="font-size:0.9em; color:#666;">(同分判定順序：勝場數 &gt; 對戰勝負 &gt; 加賽勝負)</p>
         <table class="rr-standings">
             <thead>
                 <tr>
@@ -215,6 +223,7 @@
                     <th>勝</th>
                     <th>敗</th>
                     <th>勝率</th>
+                    <th>備註</th>
                 </tr>
             </thead>
             <tbody id="advanced-standings-body"></tbody>
@@ -223,6 +232,16 @@
         <h3>⚔️ 對戰矩陣</h3>
         <p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。若您是管理員，請點擊格子切換：勝 -> 敗 -> 未戰)</p>
         <div id="advanced-grid-area" style="overflow-x: auto;"></div>
+
+        <div class="playoff-area">
+            <h3>🔥 加賽區 (解決互咬)</h3>
+            <div class="playoff-controls">
+                <label>新增加賽場次：</label>
+                <select id="playoffP1"></select> VS <select id="playoffP2"></select>
+                <button onclick="addPlayoffMatch()">新增場次</button>
+            </div>
+            <div id="advanced-playoff-matches" class="bracket-container" style="min-height: auto; border-bottom:none;"></div>
+        </div>
     </div>
 </div>
 
@@ -234,6 +253,7 @@
     let allUsers = [];
     let bracketData = { beginner: null, advanced: null };
     
+    // 設定好的安全雜湊 (43b2...a836)
     const targetHash = "43b2d122712ab1d4778f7d4ff86337f7c9aeb6d5e3ac0d0626e7288258f6a836";
 
     const firebaseConfig = {
@@ -416,7 +436,7 @@
         db.ref(`tournament/${category}`).remove().then(() => alert("賽程已清空"));
     }
 
-    // --- 回溯功能 (New!) ---
+    // --- 回溯功能 ---
     window.deleteLastSwissRound = function(category) {
         if (!isAdmin) return;
         if (!bracketData[category] || !bracketData[category].rounds || bracketData[category].rounds.length === 0) {
@@ -531,6 +551,7 @@
             type: 'round-robin',
             participants: participants,
             matches: matches,
+            playoffs: [], // 加賽區
             timestamp: Date.now()
         });
     }
@@ -622,11 +643,13 @@
         if (data.type !== 'round-robin') return;
         const participants = data.participants || [];
         const matches = data.matches || [];
+        const playoffs = data.playoffs || [];
 
         // Standings
         const stats = {};
-        participants.forEach(p => stats[p.id] = { name: p.name, wins: 0, losses: 0, id: p.id });
+        participants.forEach(p => stats[p.id] = { name: p.name, wins: 0, losses: 0, id: p.id, playoffStatus: null });
 
+        // Count main matches
         matches.forEach(m => {
             if (m.winner) {
                 stats[m.winner].wins++;
@@ -635,9 +658,39 @@
             }
         });
 
+        // Track Playoff Results
+        playoffs.forEach(m => {
+            if(m.winner) {
+                if(stats[m.winner]) stats[m.winner].playoffStatus = 'win';
+                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
+                if(stats[loserId]) stats[loserId].playoffStatus = 'loss';
+            }
+        });
+
+        // Sorting Logic: Wins -> Head-to-Head -> Playoff
         const sortedStats = Object.values(stats).sort((a, b) => {
             if (b.wins !== a.wins) return b.wins - a.wins;
-            return a.losses - b.losses;
+            
+            // Head-to-Head Check
+            const directMatch = matches.find(m => 
+                (m.p1.id === a.id && m.p2.id === b.id) || 
+                (m.p1.id === b.id && m.p2.id === a.id)
+            );
+            if (directMatch && directMatch.winner) {
+                if (directMatch.winner === a.id) return -1; // A wins
+                if (directMatch.winner === b.id) return 1;  // B wins
+            }
+
+            // Playoff Check
+            const playoffMatch = playoffs.find(m => 
+                (m.p1.id === a.id && m.p2.id === b.id) || 
+                (m.p1.id === b.id && m.p2.id === a.id)
+            );
+            if (playoffMatch && playoffMatch.winner) {
+                return (playoffMatch.winner === a.id) ? -1 : 1;
+            }
+
+            return 0;
         });
 
         const standingsBody = document.getElementById('advanced-standings-body');
@@ -645,6 +698,8 @@
         sortedStats.forEach((s, idx) => {
             let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
             const winRate = (s.wins + s.losses) > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) + '%' : '-';
+            let note = s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>' : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
+            
             standingsBody.innerHTML += `
                 <tr>
                     <td class="${rankClass}">#${idx + 1}</td>
@@ -652,6 +707,7 @@
                     <td>${s.wins}</td>
                     <td>${s.losses}</td>
                     <td>${winRate}</td>
+                    <td>${note}</td>
                 </tr>
             `;
         });
@@ -701,6 +757,32 @@
         });
         gridHtml += '</table>';
         gridArea.innerHTML = gridHtml;
+
+        // Playoff Dropdowns
+        const p1Select = document.getElementById('playoffP1');
+        const p2Select = document.getElementById('playoffP2');
+        if (p1Select.options.length === 0) { 
+            p1Select.innerHTML = ''; p2Select.innerHTML = '';
+            participants.forEach(p => {
+                p1Select.add(new Option(p.name, JSON.stringify(p)));
+                p2Select.add(new Option(p.name, JSON.stringify(p)));
+            });
+        }
+
+        // Render Playoffs
+        const playoffContainer = document.getElementById('advanced-playoff-matches');
+        playoffContainer.innerHTML = '';
+        playoffs.forEach((match, idx) => {
+            const matchDiv = document.createElement('div');
+            matchDiv.className = 'match'; matchDiv.style.margin = '5px 10px';
+            
+            const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, 'advanced_playoff', 'playoff', idx, 'p1');
+            const p2Html = createPlayerHtml(match.p2, match.p1, match.winner, 'advanced_playoff', 'playoff', idx, 'p2');
+            let delBtn = isAdmin ? `<button onclick="deletePlayoff(${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
+
+            matchDiv.innerHTML = `${delBtn}${p1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${p2Html}`;
+            playoffContainer.appendChild(matchDiv);
+        });
     }
 
     // --- Interaction ---
@@ -714,18 +796,26 @@
         
         let clickAction = '';
         if (isAdmin) {
-            if (!isLatest && category === 'beginner') {
-                // 如果不是最後一輪，且是瑞士制 -> 鎖定
-                classes += ' locked';
-                clickAction = `onclick="alert('⚠️ 無法修改歷史輪次的成績！\\n若需修正，請點擊上方的「刪除最後一輪」按鈕回溯。')"`
-            } else {
-                // 正常可點擊狀態
-                if (!matchWinnerId && player.id !== 'BYE') {
-                    classes += ' clickable';
-                    clickAction = `onclick="window.setSwissWinner('${category}', ${rIdx}, ${mIdx}, '${player.id}')"`;
-                } else if (matchWinnerId && matchWinnerId === player.id && opponent.id !== 'BYE') {
-                    classes += ' undoable';
-                    clickAction = `onclick="window.resetSwissMatch('${category}', ${rIdx}, ${mIdx})"`;
+            // Swiss Logic
+            if (category === 'beginner') {
+                if (!isLatest) {
+                    classes += ' locked';
+                    clickAction = `onclick="alert('⚠️ 無法修改歷史輪次的成績！\\n若需修正，請點擊上方的「刪除最後一輪」按鈕回溯。')"`
+                } else {
+                    if (!matchWinnerId && player.id !== 'BYE') {
+                        classes += ' clickable';
+                        clickAction = `onclick="window.setSwissWinner('${category}', ${rIdx}, ${mIdx}, '${player.id}')"`;
+                    } else if (matchWinnerId && matchWinnerId === player.id && opponent.id !== 'BYE') {
+                        classes += ' undoable';
+                        clickAction = `onclick="window.resetSwissMatch('${category}', ${rIdx}, ${mIdx})"`;
+                    }
+                }
+            } 
+            // Advanced Playoff Logic
+            else if (category === 'advanced_playoff') {
+                if (!matchWinnerId || (matchWinnerId === player.id)) {
+                     classes += ' clickable';
+                     clickAction = `onclick="setPlayoffWinner(${mIdx}, '${player.id}')"`;
                 }
             }
         }
@@ -756,6 +846,33 @@
 
         db.ref(`tournament/advanced/matches/${matchIndex}`).update({ winner: newWinner });
     };
+
+    // Advanced Playoff Actions
+    window.addPlayoffMatch = function() {
+        const p1Val = document.getElementById('playoffP1').value;
+        const p2Val = document.getElementById('playoffP2').value;
+        if (!p1Val || !p2Val) return;
+        const p1Data = JSON.parse(p1Val);
+        const p2Data = JSON.parse(p2Val);
+        if (p1Data.id === p2Data.id) { alert("不能選擇同一人對戰"); return; }
+        let playoffs = bracketData.advanced.playoffs || [];
+        playoffs.push({ p1: p1Data, p2: p2Data, winner: null });
+        db.ref(`tournament/advanced/playoffs`).set(playoffs);
+    }
+
+    window.setPlayoffWinner = function(matchIdx, winnerId) {
+        const match = bracketData.advanced.playoffs[matchIdx];
+        let newWinner = winnerId;
+        if (match.winner === winnerId) newWinner = null;
+        db.ref(`tournament/advanced/playoffs/${matchIdx}`).update({ winner: newWinner });
+    }
+
+    window.deletePlayoff = function(idx) {
+        if(!confirm("確定刪除這場加賽？")) return;
+        let playoffs = bracketData.advanced.playoffs;
+        playoffs.splice(idx, 1);
+        db.ref(`tournament/advanced/playoffs`).set(playoffs);
+    }
 </script>
 
 </body>
