@@ -434,30 +434,52 @@
                 [participants[i], participants[j]] = [participants[j], participants[i]];
             }
         }
-        participants.sort((a, b) => b.wins - a.wins || 0.5 - Math.random());
+        // 先洗牌，同分同輔分時才會是隨機；排序規則與排行榜一致（勝場 > SOS）
+        for (let i = participants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [participants[i], participants[j]] = [participants[j], participants[i]];
+        }
+        const winsOf = {};
+        participants.forEach(p => winsOf[p.id] = p.wins);
+        participants.forEach(p => p.sos = p.played.reduce((acc, id) => acc + (winsOf[id] || 0), 0));
+        participants.sort((a, b) => b.wins - a.wins || b.sos - a.sos);
+
         const newRoundMatches = [];
-        const paired = new Set();
-        for (let i = 0; i < participants.length; i++) {
-            const p1 = participants[i];
-            if (paired.has(p1.id)) continue;
-            let p2 = null;
-            for (let j = i + 1; j < participants.length; j++) {
-                const candidate = participants[j];
-                if (!paired.has(candidate.id) && !p1.played.includes(candidate.id)) { p2 = candidate; break; }
+        // 整輪一起找最佳配對，優先順序：不重複輪空 > 不重複對戰 > 勝場差距最小 > 排名相近
+        const REPEAT_BYE_COST = 1000000000;
+        const REMATCH_COST = 1000000;
+        const solve = (pool, mask, memo) => {
+            if (mask === (1 << pool.length) - 1) return { cost: 0, pairs: [] };
+            if (memo.has(mask)) return memo.get(mask);
+            let i = 0;
+            while (mask & (1 << i)) i++;
+            let best = null;
+            for (let j = i + 1; j < pool.length; j++) {
+                if (mask & (1 << j)) continue;
+                const gap = pool[i].wins - pool[j].wins;
+                const edge = gap * gap + (pool[i].played.includes(pool[j].id) ? REMATCH_COST : 0);
+                const rest = solve(pool, mask | (1 << i) | (1 << j), memo);
+                if (!best || edge + rest.cost < best.cost) best = { cost: edge + rest.cost, pairs: [[pool[i], pool[j]], ...rest.pairs] };
             }
-            if (!p2) {
-                for (let j = i + 1; j < participants.length; j++) {
-                    if (!paired.has(participants[j].id)) { p2 = participants[j]; break; }
-                }
-            }
-            if (p2) {
-                newRoundMatches.push({ p1: {name: p1.name, id: p1.id}, p2: {name: p2.name, id: p2.id}, winner: null });
-                paired.add(p1.id); paired.add(p2.id);
-            } else {
-                newRoundMatches.push({ p1: {name: p1.name, id: p1.id}, p2: {name: "輪空", id: "BYE"}, winner: p1.id });
-                paired.add(p1.id);
+            memo.set(mask, best);
+            return best;
+        };
+        let plan = null;
+        if (participants.length % 2 === 0) {
+            plan = { bye: null, ...solve(participants, 0, new Map()) };
+        } else {
+            // 奇數人：每個人都試當輪空，從排名最低的開始試
+            for (let b = participants.length - 1; b >= 0; b--) {
+                const byeP = participants[b];
+                const result = solve(participants.filter((_, i) => i !== b), 0, new Map());
+                const cost = result.cost + (byeP.played.includes('BYE') ? REPEAT_BYE_COST : 0);
+                if (!plan || cost < plan.cost) plan = { bye: byeP, pairs: result.pairs, cost };
             }
         }
+        if (plan.bye) newRoundMatches.push({ p1: {name: plan.bye.name, id: plan.bye.id}, p2: {name: "輪空", id: "BYE"}, winner: plan.bye.id });
+        plan.pairs.forEach(([p1, p2]) => {
+            newRoundMatches.push({ p1: {name: p1.name, id: p1.id}, p2: {name: p2.name, id: p2.id}, winner: null });
+        });
         rounds.push(newRoundMatches);
         // 保留原有的加賽資料
         const existingPlayoffs = (bracketData.beginner && bracketData.beginner.playoffs) ? bracketData.beginner.playoffs : [];
