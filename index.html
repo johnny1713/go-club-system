@@ -648,7 +648,7 @@
             .catch(err => {
                 const text = String((err && (err.code || err.message)) || err);
                 if (text.includes('timeout')) alert("連線逾時，請確認網路後到「報名名單」查看，沒有出現再重新報名。");
-                else if (/permission/i.test(text)) alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別），或報名已截止。");
+                else if (/permission/i.test(text)) alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別）、該組已開賽，或報名已截止。");
                 else alert("報名失敗，請確認網路後再試一次。\n" + text);
             })
             .finally(() => { clearTimeout(timer); submitBtn.disabled = false; });
@@ -667,7 +667,7 @@
                     ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''} ${user.category !== c && isLocked(c) ? 'disabled' : ''}>${CATEGORIES[c].label}</option>`).join('')}
                 </select>` : `<span class="tag ${catClass}">${esc(catInfo.label)}</span>`;
             const field = (key) => isAdmin
-                ? `<input class="edit-input" value="${esc(user[key])}" onchange="updateUser(${id}, '${key}', this.value, this)">`
+                ? `<input class="edit-input" maxlength="${key === 'name' ? 30 : 50}" value="${esc(user[key])}" onchange="updateUser(${id}, '${key}', this.value, this)">`
                 : esc(user[key]);
             return `<tr>
                 <td>${categoryHtml}</td>
@@ -721,8 +721,8 @@
                 return `<td class="person-check"><input type="checkbox" ${row ? 'checked' : ''} ${disabled} onchange="${action}"></td>`;
             }).join('');
             return `<tr>
-                <td><input class="edit-input" value="${esc(first.name)}" onchange="updateUser(${id}, 'name', this.value, this)"></td>
-                <td><input class="edit-input" value="${esc(first.empId)}" onchange="updateUser(${id}, 'empId', this.value, this)"></td>
+                <td><input class="edit-input" maxlength="30" value="${esc(first.name)}" onchange="updateUser(${id}, 'name', this.value, this)"></td>
+                <td><input class="edit-input" maxlength="50" value="${esc(first.empId)}" onchange="updateUser(${id}, 'empId', this.value, this)"></td>
                 ${cells}</tr>`;
         }).join('');
     }
@@ -790,6 +790,8 @@
         const user = allUsers.find(u => u.id === id);
         const restore = () => { if (inputEl && user) inputEl.value = user[field]; };
         if (!value) { alert("不可為空白"); restore(); return; }
+        if (field === 'name' && value.length > 30) { alert("姓名最多 30 個字"); restore(); return; }
+        if (field === 'empId' && value.length > 50) { alert("工號最多 50 個字"); restore(); return; }
         if (!user) return;
         // 同一人報多組時，姓名和工號要一起改
         const rows = allUsers.filter(u => u.id === id || samePerson(u, user));
