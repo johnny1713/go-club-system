@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圍棋社比賽系統_v1.0</title>
+    <title>圍棋社比賽系統</title>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
@@ -123,8 +123,8 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('register')">報名頁面</div>
         <div class="tab" onclick="switchTab('list')">報名名單</div>
-        <div class="tab" onclick="switchTab('bracket-beginner')">入門組對戰表</div>
-        <div class="tab" onclick="switchTab('bracket-advanced')">進階組對戰表</div>
+        <div class="tab" onclick="switchTab('bracket-beginner')">入門組 13路</div>
+        <div class="tab" onclick="switchTab('bracket-advanced')">進階組 19路</div>
     </div>
 
     <div id="register" class="tab-content active">
@@ -140,8 +140,8 @@
             <div class="form-group">
                 <label>組別</label>
                 <select id="regCategory">
-                    <option value="beginner">入門組 (瑞士制)</option>
-                    <option value="advanced">進階組 (循環賽)</option>
+                    <option value="beginner">入門組 (13路)</option>
+                    <option value="advanced">進階組 (19路)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -177,76 +177,98 @@
     </div>
 
     <div id="bracket-beginner" class="tab-content">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>入門組 對戰表 (瑞士制 Swiss System)</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h2 id="beginner-title">入門組 13路 對戰表</h2>
             <div>
-                <button class="admin-btn warning" onclick="deleteLastSwissRound('beginner')">🔙 刪除最後一輪</button>
+                <span id="beginner-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('beginner')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('beginner')">➕ 產生下一輪</button>
+                </span>
+                <span id="beginner-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('beginner')">重新產生</button>
+                </span>
                 <button class="admin-btn danger" onclick="clearBracket('beginner')">🗑️ 清空賽程</button>
-                <button class="admin-btn success" onclick="generateNextSwissRound('beginner')">➕ 產生下一輪</button>
             </div>
         </div>
-        
-        <p style="color:#666; font-size:0.9em; margin:10px 0;">
-            💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。
-        </p>
 
-        <div id="beginner-swiss-rounds"></div>
+        <div id="beginner-format-panel" style="display:none; background:#f8f9fa; border:1px solid #e9ecef; padding:15px; margin:10px 0; border-radius:5px;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="beginner-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('beginner')">產生對戰表</button>
+        </div>
+        <p id="beginner-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="beginner-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="beginner-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="beginner-notice"></div>
 
-        <h3>🏆 入門組 戰績排行榜</h3>
-        <table class="rr-standings">
-            <thead>
-                <tr><th>名次</th><th>姓名</th><th>主分 (勝場)</th><th>輔分 (SOS)</th><th>備註</th><th>對戰紀錄</th></tr>
-            </thead>
-            <tbody id="beginner-standings-body"></tbody>
-        </table>
-
-        <div class="playoff-area">
-            <h3>🔥 入門組 加賽區 (同分且同輔分時使用)</h3>
-            <div class="playoff-controls">
-                <label>新增場次：</label>
-                <select id="begPlayoffP1"></select> VS <select id="begPlayoffP2"></select>
-                <button onclick="addBeginnerPlayoffMatch()">新增</button>
+        <div id="beginner-content" style="display:none;">
+            <div id="beginner-rounds"></div>
+            <h3>🏆 入門組 戰績排行榜</h3>
+            <table class="rr-standings">
+                <thead id="beginner-standings-head"></thead>
+                <tbody id="beginner-standings-body"></tbody>
+            </table>
+            <div id="beginner-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 入門組 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="beginner-playoff-p1"></select> VS <select id="beginner-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('beginner')">新增</button>
+                </div>
+                <div id="beginner-playoff-matches" class="playoff-matches-container"></div>
             </div>
-            <div id="beginner-playoff-matches" class="playoff-matches-container"></div>
         </div>
     </div>
 
     <div id="bracket-advanced" class="tab-content">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2>進階組 對戰表 (循環賽 Round Robin)</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h2 id="advanced-title">進階組 19路 對戰表</h2>
             <div>
-                <button class="admin-btn danger" onclick="clearBracket('advanced')">🗑️ 清空對戰表</button>
-                <button class="admin-btn" onclick="generateRoundRobinBracket()">重新產生</button>
+                <span id="advanced-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('advanced')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('advanced')">➕ 產生下一輪</button>
+                </span>
+                <span id="advanced-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('advanced')">重新產生</button>
+                </span>
+                <button class="admin-btn danger" onclick="clearBracket('advanced')">🗑️ 清空賽程</button>
             </div>
         </div>
-        
-        <h3>🏆 進階組 戰績排行榜</h3>
-        <table class="rr-standings">
-            <thead>
-                <tr>
-                    <th>名次</th>
-                    <th>姓名</th>
-                    <th>勝</th>
-                    <th>敗</th>
-                    <th>勝率</th>
-                    <th>備註</th>
-                </tr>
-            </thead>
-            <tbody id="advanced-standings-body"></tbody>
-        </table>
 
-        <h3>⚔️ 對戰矩陣</h3>
-        <p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。若您是管理員，請點擊格子切換：勝 -> 敗 -> 未戰)</p>
-        <div id="advanced-grid-area" style="overflow-x: auto;"></div>
+        <div id="advanced-format-panel" style="display:none; background:#f8f9fa; border:1px solid #e9ecef; padding:15px; margin:10px 0; border-radius:5px;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="advanced-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('advanced')">產生對戰表</button>
+        </div>
+        <p id="advanced-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="advanced-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="advanced-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="advanced-notice"></div>
 
-        <div class="playoff-area">
-            <h3>🔥 進階組 加賽區 (解決互咬)</h3>
-            <div class="playoff-controls">
-                <label>新增場次：</label>
-                <select id="advPlayoffP1"></select> VS <select id="advPlayoffP2"></select>
-                <button onclick="addPlayoffMatch('advanced')">新增</button>
+        <div id="advanced-content" style="display:none;">
+            <div id="advanced-rounds"></div>
+            <h3>🏆 進階組 戰績排行榜</h3>
+            <table class="rr-standings">
+                <thead id="advanced-standings-head"></thead>
+                <tbody id="advanced-standings-body"></tbody>
+            </table>
+            <div id="advanced-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 進階組 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="advanced-playoff-p1"></select> VS <select id="advanced-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('advanced')">新增</button>
+                </div>
+                <div id="advanced-playoff-matches" class="playoff-matches-container"></div>
             </div>
-            <div id="advanced-playoff-matches" class="playoff-matches-container"></div>
         </div>
     </div>
 </div>
@@ -255,10 +277,16 @@
     // 1. 全域變數
     let clickCount = 0;
     let isAdmin = false;
-    let isRegistrationOpen = true; 
+    let isRegistrationOpen = true;
     let allUsers = [];
     let bracketData = { beginner: null, advanced: null };
-    
+
+    const CATEGORIES = {
+        beginner: { label: '入門組', board: '13路' },
+        advanced: { label: '進階組', board: '19路' }
+    };
+    const FORMATS = { 'swiss': '瑞士制', 'round-robin': '循環賽' };
+
     const targetToken = "UXJkYzE4OTMzR29DbHVi";
 
     const firebaseConfig = {
@@ -275,7 +303,33 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. 函式定義
+    // 2. 工具函式
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    // 放進 onclick="..." 的字串參數
+    function jsArg(value) { return esc(JSON.stringify(String(value))); }
+    function showDbError(err) { alert("寫入失敗，請確認網路或權限：\n" + (err && err.message ? err.message : err)); }
+    function write(promise) { return promise.catch(showDbError); }
+    // 改名後，舊賽程也要顯示最新名字
+    function nameOf(player) {
+        const user = allUsers.find(u => u.id === player.id);
+        return user ? user.name : player.name;
+    }
+    function isSamePair(m, idA, idB) {
+        return (m.p1.id === idA && m.p2.id === idB) || (m.p1.id === idB && m.p2.id === idA);
+    }
+    function categoryUsers(category) { return allUsers.filter(u => u.category === category); }
+    function isInBracket(userId) {
+        return Object.keys(CATEGORIES).some(cat => {
+            const data = bracketData[cat];
+            if (!data) return false;
+            const matches = data.type === 'swiss' ? (data.rounds || []).flat() : (data.matches || []);
+            return matches.some(m => m.p1.id === userId || m.p2.id === userId);
+        });
+    }
+
+    // 3. 管理員 / 報名
     function enableAdminMode() {
         isAdmin = true;
         localStorage.setItem('goClubAdmin', 'true');
@@ -283,7 +337,7 @@
         document.getElementById('adminStatus').style.display = 'block';
         updateRegistrationUI();
         renderList();
-        refreshBrackets(); 
+        refreshBrackets();
     }
 
     function logout() {
@@ -293,49 +347,32 @@
         document.getElementById('adminStatus').style.display = 'none';
         updateRegistrationUI();
         renderList();
-        refreshBrackets(); 
+        refreshBrackets();
     }
 
     function toggleRegistration(status) {
-        db.ref('config/registrationOpen').set(status);
-        alert(status ? "報名已開啟" : "報名已截止");
+        if (!isAdmin) return;
+        write(db.ref('config/registrationOpen').set(status).then(() => alert(status ? "報名已開啟" : "報名已截止")));
     }
 
     function updateRegistrationUI() {
         const formDiv = document.getElementById('registrationForm');
         const closedMsg = document.getElementById('regClosedMsg');
         const adminStatusLabel = document.getElementById('adminRegStatus');
-        
         if (adminStatusLabel) {
-            adminStatusLabel.innerText = isRegistrationOpen ? "(目前狀態：開啟)" : "(目前狀態：截止)";
+            adminStatusLabel.textContent = isRegistrationOpen ? "(目前狀態：開啟)" : "(目前狀態：截止)";
             adminStatusLabel.style.color = isRegistrationOpen ? "green" : "red";
         }
-
-        if (isAdmin) {
-            if(formDiv) formDiv.style.display = 'block';
-            if(closedMsg) closedMsg.style.display = 'none';
-        } else {
-            if (isRegistrationOpen) {
-                if(formDiv) formDiv.style.display = 'block';
-                if(closedMsg) closedMsg.style.display = 'none';
-            } else {
-                if(formDiv) formDiv.style.display = 'none';
-                if(closedMsg) closedMsg.style.display = 'block';
-            }
-        }
-    }
-
-    function refreshBrackets() {
-        if(bracketData.beginner) renderSwissUI('beginner', bracketData.beginner);
-        if(bracketData.advanced) renderRoundRobinUI(bracketData.advanced);
+        const showForm = isAdmin || isRegistrationOpen;
+        if (formDiv) formDiv.style.display = showForm ? 'block' : 'none';
+        if (closedMsg) closedMsg.style.display = showForm ? 'none' : 'block';
     }
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
-        const index = tabs.indexOf(tabId);
-        document.querySelectorAll('.tab')[index].classList.add('active');
+        document.querySelectorAll('.tab')[tabs.indexOf(tabId)].classList.add('active');
         document.getElementById(tabId).classList.add('active');
     }
 
@@ -345,111 +382,93 @@
         const empId = document.getElementById('regEmpId').value.trim();
         const category = document.getElementById('regCategory').value;
         if (!name || !empId) { alert("請填寫完整資訊"); return; }
-        const isDuplicate = allUsers.some(u => u.empId === empId);
-        if (isDuplicate) { alert("此工號已報名過，請勿重複報名！"); return; }
-        db.ref('users').push({ name, empId, category, timestamp: new Date().toISOString() })
-          .then(() => { alert("報名成功！"); document.getElementById('regName').value = ''; document.getElementById('regEmpId').value = ''; switchTab('list'); });
+        if (allUsers.some(u => u.empId === empId)) { alert("此工號已報名過，請勿重複報名！"); return; }
+        write(db.ref('users').push({ name, empId, category, timestamp: new Date().toISOString() })
+            .then(() => {
+                alert("報名成功！");
+                document.getElementById('regName').value = '';
+                document.getElementById('regEmpId').value = '';
+                switchTab('list');
+            }));
     }
 
     function renderList() {
         const tbody = document.getElementById('registrantsTable');
-        if(!tbody) return;
-        tbody.innerHTML = '';
-        allUsers.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        allUsers.forEach(user => {
+        if (!tbody) return;
+        const rows = [...allUsers].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(user => {
             const dateStr = new Date(user.timestamp).toLocaleString('zh-TW');
-            const catText = user.category === 'beginner' ? '入門' : '進階';
+            const id = jsArg(user.id);
             const catClass = user.category === 'beginner' ? 'tag-beginner' : 'tag-advanced';
-            let categoryHtml = isAdmin ? 
-                `<select class="admin-select" onchange='updateUser("${user.id}", "category", this.value)'>
-                    <option value="beginner" ${user.category === 'beginner' ? 'selected' : ''}>入門組</option>
-                    <option value="advanced" ${user.category === 'advanced' ? 'selected' : ''}>進階組</option>
-                </select>` : `<span class="tag ${catClass}">${catText}</span>`;
-            
-            tbody.innerHTML += `<tr>
+            const catInfo = CATEGORIES[user.category] || { label: user.category, board: '' };
+            const categoryHtml = isAdmin ?
+                `<select class="admin-select" onchange="updateUser(${id}, 'category', this.value, this)">
+                    ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''}>${CATEGORIES[c].label}</option>`).join('')}
+                </select>` : `<span class="tag ${catClass}">${esc(catInfo.label)}</span>`;
+            const field = (key) => isAdmin
+                ? `<input class="edit-input" value="${esc(user[key])}" onchange="updateUser(${id}, '${key}', this.value, this)">`
+                : esc(user[key]);
+            return `<tr>
                 <td>${categoryHtml}</td>
-                <td>${isAdmin ? `<input class='edit-input' value='${user.name}' onchange='updateUser("${user.id}", "name", this.value)'>` : user.name}</td>
-                <td>${isAdmin ? `<input class='edit-input' value='${user.empId}' onchange='updateUser("${user.id}", "empId", this.value)'>` : user.empId}</td>
-                <td class="time-text">${dateStr}</td>
-                <td class="admin-action"><button class="danger" onclick="deleteUser('${user.id}')">刪除</button></td>
+                <td>${field('name')}</td>
+                <td>${field('empId')}</td>
+                <td class="time-text">${esc(dateStr)}</td>
+                <td class="admin-action"><button class="danger" onclick="deleteUser(${id})">刪除</button></td>
             </tr>`;
         });
+        tbody.innerHTML = rows.join('');
     }
 
-    function updateUser(id, field, value) { db.ref('users/' + id).update({ [field]: value }); }
-    function deleteUser(id) { if (confirm("確定要刪除這位報名者嗎？")) db.ref('users/' + id).remove(); }
+    function updateUser(id, field, rawValue, inputEl) {
+        if (!isAdmin) return;
+        const value = String(rawValue).trim();
+        const user = allUsers.find(u => u.id === id);
+        const restore = () => { if (inputEl && user) inputEl.value = user[field]; };
+        if (!value) { alert("不可為空白"); restore(); return; }
+        if (field === 'empId' && allUsers.some(u => u.id !== id && u.empId === value)) { alert("此工號已被其他人使用"); restore(); return; }
+        if (field === 'category' && isInBracket(id) &&
+            !confirm("這位選手已在賽程中。換組後不會被排進之後的輪次，已打完的成績會留在原組別。確定要換組嗎？")) { restore(); return; }
+        write(db.ref('users/' + id).update({ [field]: value }));
+    }
+
+    function deleteUser(id) {
+        if (!isAdmin) return;
+        const warning = isInBracket(id) ? "\n\n⚠️ 這位選手已在賽程中！刪除後不會再被配對，已打完的成績仍會保留。" : "";
+        if (confirm("確定要刪除這位報名者嗎？" + warning)) write(db.ref('users/' + id).remove());
+    }
 
     function clearBracket(category) {
-        if (!confirm(`確定要清空【${category === 'beginner' ? '入門組' : '進階組'}】的賽程嗎？\n(報名資料會保留)`)) return;
-        db.ref(`tournament/${category}`).remove().then(() => alert("賽程已清空"));
+        if (!isAdmin) return;
+        if (!confirm(`確定要清空【${CATEGORIES[category].label}】的賽程嗎？\n(報名資料會保留)`)) return;
+        write(db.ref(`tournament/${category}`).remove().then(() => alert("賽程已清空")));
     }
 
-    // --- 回溯功能 ---
+    // 4. 產生對戰表
+    function generateBracket(category) {
+        if (!isAdmin) return;
+        const format = document.getElementById(`${category}-format`).value;
+        if (format === 'swiss') generateNextSwissRound(category);
+        else generateRoundRobinBracket(category);
+    }
+
     window.deleteLastSwissRound = function(category) {
         if (!isAdmin) return;
-        if (!bracketData[category] || !bracketData[category].rounds || bracketData[category].rounds.length === 0) {
-            alert("沒有可以刪除的輪次！");
-            return;
-        }
-        const currentRounds = bracketData[category].rounds;
-        const roundNum = currentRounds.length;
+        const data = bracketData[category];
+        if (!data || !data.rounds || data.rounds.length === 0) { alert("沒有可以刪除的輪次！"); return; }
+        const roundNum = data.rounds.length;
         if (!confirm(`⚠️ 危險操作：\n確定要刪除「第 ${roundNum} 輪」的對戰嗎？\n\n(這通常用於修正上一輪的成績錯誤)`)) return;
-        currentRounds.pop();
-        db.ref(`tournament/${category}/rounds`).set(currentRounds)
-            .then(() => alert(`已刪除第 ${roundNum} 輪。`));
-    }
+        write(db.ref(`tournament/${category}/rounds`).set(data.rounds.slice(0, -1))
+            .then(() => alert(`已刪除第 ${roundNum} 輪。`)));
+    };
 
-    // --- 瑞士制生成邏輯 ---
-    function generateNextSwissRound() {
-        if (!confirm(`確定要產生【入門組】下一輪對戰嗎？`)) return;
-        let participants = allUsers.filter(u => u.category === 'beginner').map(u => ({ name: u.name, id: u.id, wins: 0, played: [] }));
-        let rounds = [];
-        if (bracketData.beginner && bracketData.beginner.rounds) {
-            rounds = bracketData.beginner.rounds;
-            const lastRound = rounds[rounds.length - 1];
-            
-            const unfinishedMatches = lastRound.filter(m => !m.winner && m.p1.id !== 'BYE' && m.p2.id !== 'BYE');
-            if (unfinishedMatches.length > 0) {
-                let msg = "⚠️ 上一輪還有比賽未登錄成績！\n請點擊獲勝者的名字。\n\n未完成場次：\n";
-                unfinishedMatches.forEach(m => {
-                    msg += `- ${m.p1.name} vs ${m.p2.name}\n`;
-                });
-                alert(msg);
-                return;
-            }
-            
-            rounds.forEach(round => {
-                round.forEach(m => {
-                    if (m.winner) {
-                        const winner = participants.find(p => p.id === m.winner);
-                        const loser = participants.find(p => p.id === (m.winner === m.p1.id ? m.p2.id : m.p1.id));
-                        if(winner) { winner.wins++; winner.played.push(loser ? loser.id : 'BYE'); }
-                        if(loser) { loser.played.push(winner ? winner.id : 'BYE'); }
-                    }
-                });
-            });
-        } else {
-             for (let i = participants.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [participants[i], participants[j]] = [participants[j], participants[i]];
-            }
-        }
-        // 先洗牌，同分同輔分時才會是隨機；排序規則與排行榜一致（勝場 > SOS）
-        for (let i = participants.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [participants[i], participants[j]] = [participants[j], participants[i]];
-        }
-        const winsOf = {};
-        participants.forEach(p => winsOf[p.id] = p.wins);
-        participants.forEach(p => p.sos = p.played.reduce((acc, id) => acc + (winsOf[id] || 0), 0));
-        participants.sort((a, b) => b.wins - a.wins || b.sos - a.sos);
-
-        const newRoundMatches = [];
-        // 整輪一起找最佳配對，優先順序：不重複輪空 > 不重複對戰 > 勝場差距最小 > 排名相近
-        const REPEAT_BYE_COST = 1000000000;
-        const REMATCH_COST = 1000000;
-        const solve = (pool, mask, memo) => {
-            if (mask === (1 << pool.length) - 1) return { cost: 0, pairs: [] };
+    // 整輪配對：不重複對戰 > 勝場差距最小 > 排名相近。人多時分段計算，避免算太久
+    const MAX_EXACT_PLAYERS = 20;
+    const REMATCH_COST = 1000000;
+    const REPEAT_BYE_COST = 1000000000;
+    function solvePairs(pool) {
+        const memo = new Map();
+        const full = (1 << pool.length) - 1;
+        const solve = (mask) => {
+            if (mask === full) return { cost: 0, pairs: [] };
             if (memo.has(mask)) return memo.get(mask);
             let i = 0;
             while (mask & (1 << i)) i++;
@@ -458,458 +477,375 @@
                 if (mask & (1 << j)) continue;
                 const gap = pool[i].wins - pool[j].wins;
                 const edge = gap * gap + (pool[i].played.includes(pool[j].id) ? REMATCH_COST : 0);
-                const rest = solve(pool, mask | (1 << i) | (1 << j), memo);
+                const rest = solve(mask | (1 << i) | (1 << j));
                 if (!best || edge + rest.cost < best.cost) best = { cost: edge + rest.cost, pairs: [[pool[i], pool[j]], ...rest.pairs] };
             }
             memo.set(mask, best);
             return best;
         };
-        let plan = null;
-        if (participants.length % 2 === 0) {
-            plan = { bye: null, ...solve(participants, 0, new Map()) };
-        } else {
-            // 奇數人：每個人都試當輪空，從排名最低的開始試
-            for (let b = participants.length - 1; b >= 0; b--) {
-                const byeP = participants[b];
-                const result = solve(participants.filter((_, i) => i !== b), 0, new Map());
-                const cost = result.cost + (byeP.played.includes('BYE') ? REPEAT_BYE_COST : 0);
-                if (!plan || cost < plan.cost) plan = { bye: byeP, pairs: result.pairs, cost };
-            }
+        return solve(0);
+    }
+    function pairPlayers(players) {
+        if (players.length <= MAX_EXACT_PLAYERS) return solvePairs(players);
+        const result = { cost: 0, pairs: [] };
+        for (let i = 0; i < players.length; i += 16) {
+            const part = solvePairs(players.slice(i, i + 16));
+            result.cost += part.cost;
+            result.pairs.push(...part.pairs);
         }
-        if (plan.bye) newRoundMatches.push({ p1: {name: plan.bye.name, id: plan.bye.id}, p2: {name: "輪空", id: "BYE"}, winner: plan.bye.id });
-        plan.pairs.forEach(([p1, p2]) => {
-            newRoundMatches.push({ p1: {name: p1.name, id: p1.id}, p2: {name: p2.name, id: p2.id}, winner: null });
-        });
-        rounds.push(newRoundMatches);
-        // 保留原有的加賽資料
-        const existingPlayoffs = (bracketData.beginner && bracketData.beginner.playoffs) ? bracketData.beginner.playoffs : [];
-        db.ref(`tournament/beginner`).set({ type: 'swiss', rounds: rounds, playoffs: existingPlayoffs, timestamp: Date.now() });
+        return result;
+    }
+    function planRound(players) {
+        if (players.length % 2 === 0) return { bye: null, ...pairPlayers(players) };
+        let plan = null;
+        for (let b = players.length - 1; b >= 0; b--) {
+            const byePlayer = players[b];
+            const repeatBye = byePlayer.played.includes('BYE');
+            if (players.length > MAX_EXACT_PLAYERS && repeatBye && b > 0) continue;
+            const rest = pairPlayers(players.filter((_, i) => i !== b));
+            const cost = rest.cost + (repeatBye ? REPEAT_BYE_COST : 0);
+            if (!plan || cost < plan.cost) plan = { bye: byePlayer, pairs: rest.pairs, cost };
+            if (players.length > MAX_EXACT_PLAYERS) break;
+        }
+        return plan;
     }
 
-    // --- 循環賽生成邏輯 ---
-    function generateRoundRobinBracket() {
-        if (!confirm("確定要產生【進階組】循環賽對戰表嗎？")) return;
-        let participants = allUsers.filter(u => u.category === 'advanced').map(u => ({ name: u.name, id: u.id }));
-        if (participants.length < 2) { alert("人數不足"); return; }
-        let matches = [];
+    function generateNextSwissRound(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const rounds = (data && data.rounds) ? data.rounds : [];
+        const participants = categoryUsers(category).map(u => ({ name: u.name, id: u.id, wins: 0, played: [] }));
+        if (participants.length < 2) { alert("人數不足，至少需要 2 人"); return; }
+
+        if (rounds.length > 0) {
+            const unfinished = rounds[rounds.length - 1].filter(m => !m.winner);
+            if (unfinished.length > 0) {
+                alert("⚠️ 上一輪還有比賽未登錄成績！\n請點擊獲勝者的名字。\n\n未完成場次：\n" +
+                    unfinished.map(m => `- ${nameOf(m.p1)} vs ${nameOf(m.p2)}`).join('\n'));
+                return;
+            }
+        }
+        const roundLimit = participants.length % 2 === 0 ? participants.length - 1 : participants.length;
+        const extra = rounds.length >= roundLimit ? `\n\n⚠️ 已打滿 ${roundLimit} 輪，再產生一定會重複對戰。` : '';
+        if (!confirm(`確定要產生【${CATEGORIES[category].label}】第 ${rounds.length + 1} 輪對戰嗎？${extra}`)) return;
+
+        const winsOf = {};
+        rounds.flat().forEach(m => { if (m.winner) winsOf[m.winner] = (winsOf[m.winner] || 0) + 1; });
+        const byId = {};
+        participants.forEach(p => { byId[p.id] = p; p.wins = winsOf[p.id] || 0; });
+        rounds.flat().forEach(m => {
+            if (byId[m.p1.id]) byId[m.p1.id].played.push(m.p2.id);
+            if (byId[m.p2.id]) byId[m.p2.id].played.push(m.p1.id);
+        });
+        for (let i = participants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [participants[i], participants[j]] = [participants[j], participants[i]];
+        }
+        participants.forEach(p => { p.sos = p.played.reduce((acc, id) => acc + (winsOf[id] || 0), 0); });
+        participants.sort((a, b) => b.wins - a.wins || b.sos - a.sos);
+
+        const plan = planRound(participants);
+        const newRound = [];
+        if (plan.bye) newRound.push({ p1: { name: plan.bye.name, id: plan.bye.id }, p2: { name: "輪空", id: "BYE" }, winner: plan.bye.id });
+        plan.pairs.forEach(([p1, p2]) => newRound.push({ p1: { name: p1.name, id: p1.id }, p2: { name: p2.name, id: p2.id }, winner: null }));
+
+        write(db.ref(`tournament/${category}`).set({
+            type: 'swiss',
+            rounds: [...rounds, newRound],
+            playoffs: (data && data.playoffs) || [],
+            timestamp: Date.now()
+        }));
+    }
+
+    function generateRoundRobinBracket(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const played = data ? (data.matches || []).filter(m => m.winner).length : 0;
+        const label = CATEGORIES[category].label;
+        const message = played > 0
+            ? `⚠️ 目前已有 ${played} 場成績，重新產生會全部清除，而且無法復原！\n確定要重新產生【${label}】循環賽嗎？`
+            : `確定要產生【${label}】循環賽對戰表嗎？`;
+        const participants = categoryUsers(category).map(u => ({ name: u.name, id: u.id }));
+        if (participants.length < 2) { alert("人數不足，至少需要 2 人"); return; }
+        if (!confirm(message)) return;
+        const matches = [];
         for (let i = 0; i < participants.length; i++) {
             for (let j = i + 1; j < participants.length; j++) {
                 matches.push({ p1: participants[i], p2: participants[j], winner: null });
             }
         }
-        db.ref(`tournament/advanced`).set({ type: 'round-robin', participants: participants, matches: matches, playoffs: [], timestamp: Date.now() });
+        write(db.ref(`tournament/${category}`).set({ type: 'round-robin', participants, matches, playoffs: [], timestamp: Date.now() }));
     }
 
-    // --- Render Swiss ---
-    function renderSwissUI(category, data) {
-        if (data.type !== 'swiss') return;
+    // 5. 排名：同主分（瑞士制再加同輔分）的人為一組，組內先比加賽勝場，再比彼此對戰勝場
+    function rankStandings(list, matches, playoffs) {
+        const key = s => `${s.wins}|${s.sos || 0}`;
+        const winsWithin = (s, games, group) => games.filter(m =>
+            m.winner === s.id && group.some(o => o.id !== s.id && isSamePair(m, s.id, o.id))).length;
+        const groups = {};
+        list.forEach(s => { (groups[key(s)] = groups[key(s)] || []).push(s); });
+        list.forEach(s => {
+            s.tiePlayoff = winsWithin(s, playoffs, groups[key(s)]);
+            s.tieDirect = winsWithin(s, matches, groups[key(s)]);
+        });
+        return list.sort((a, b) => b.wins - a.wins || (b.sos || 0) - (a.sos || 0) ||
+            b.tiePlayoff - a.tiePlayoff || b.tieDirect - a.tieDirect);
+    }
+    function applyPlayoffStatus(stats, playoffs) {
+        playoffs.forEach(m => {
+            if (!m.winner) return;
+            const loserId = m.winner === m.p1.id ? m.p2.id : m.p1.id;
+            if (stats[m.winner]) stats[m.winner].playoffStatus = 'win';
+            if (stats[loserId]) stats[loserId].playoffStatus = 'loss';
+        });
+    }
+    function rankClass(idx) { return idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : ''; }
+    function noteHtml(s) {
+        return s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>'
+            : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
+    }
+
+    // 6. 畫面
+    function refreshBrackets() { Object.keys(CATEGORIES).forEach(renderBracket); }
+
+    function renderBracket(category) {
+        const data = bracketData[category];
+        const info = CATEGORIES[category];
+        const el = suffix => document.getElementById(`${category}-${suffix}`);
+        const type = data ? data.type : null;
+        el('title').textContent = `${info.label} ${info.board} 對戰表` + (type ? ` (${FORMATS[type]})` : '');
+        el('format-panel').style.display = (isAdmin && !data) ? 'block' : 'none';
+        el('swiss-actions').style.display = type === 'swiss' ? 'inline' : 'none';
+        el('rr-actions').style.display = type === 'round-robin' ? 'inline' : 'none';
+        el('swiss-hint').style.display = type === 'swiss' ? 'block' : 'none';
+        el('rr-hint').style.display = type === 'round-robin' ? 'block' : 'none';
+        el('content').style.display = data ? 'block' : 'none';
+        el('empty').style.display = data ? 'none' : 'block';
+        el('rounds').innerHTML = '';
+        el('grid').innerHTML = '';
+        el('notice').innerHTML = '';
+        if (!data) return;
+        if (type === 'swiss') renderSwiss(category, data); else renderRoundRobin(category, data);
+        renderPlayoffs(category, data, type === 'swiss' ? categoryUsers(category) : (data.participants || []));
+    }
+
+    function renderPlayoffs(category, data, players) {
+        const p1Select = document.getElementById(`${category}-playoff-p1`);
+        const p2Select = document.getElementById(`${category}-playoff-p2`);
+        [p1Select, p2Select].forEach(select => {
+            const kept = select.value;
+            select.innerHTML = '';
+            players.forEach(p => select.add(new Option(nameOf(p), p.id)));
+            if (players.some(p => p.id === kept)) select.value = kept;
+        });
+        const container = document.getElementById(`${category}-playoff-matches`);
+        container.innerHTML = (data.playoffs || []).map((match, idx) => {
+            const del = isAdmin ? `<button onclick="deletePlayoff('${category}', ${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
+            return `<div class="match" style="margin:5px 10px;">${del}${createPlayerHtml(match.p1, match.p2, match.winner, category, idx, 0, 'playoff')}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(match.p2, match.p1, match.winner, category, idx, 0, 'playoff')}</div>`;
+        }).join('');
+    }
+
+    function renderSwiss(category, data) {
         const rounds = data.rounds || [];
         const playoffs = data.playoffs || [];
-        const container = document.getElementById(`${category}-swiss-rounds`);
-        if(!container) return;
-        container.innerHTML = '';
+        document.getElementById(`${category}-rounds`).innerHTML = rounds.map((round, rIdx) => {
+            const mode = rIdx === rounds.length - 1 ? 'latest' : 'history';
+            const cards = round.map((m, mIdx) =>
+                `<div class="match" style="width:200px;">${createPlayerHtml(m.p1, m.p2, m.winner, category, rIdx, mIdx, mode)}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(m.p2, m.p1, m.winner, category, rIdx, mIdx, mode)}</div>`).join('');
+            return `<div class="swiss-round-container"><div class="swiss-round-title">第 ${rIdx + 1} 輪</div><div style="display:flex; flex-wrap:wrap; gap:10px;">${cards}</div></div>`;
+        }).join('');
 
-        rounds.forEach((roundMatches, rIdx) => {
-            const isLatestRound = (rIdx === rounds.length - 1);
-            const roundDiv = document.createElement('div');
-            roundDiv.className = 'swiss-round-container';
-            let roundHtml = `<div class="swiss-round-title">第 ${rIdx + 1} 輪</div><div style="display:flex; flex-wrap:wrap; gap:10px;">`;
-            roundMatches.forEach((match, mIdx) => {
-                const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, category, rIdx, mIdx, 'p1', isLatestRound);
-                const p2Html = createPlayerHtml(match.p2, match.p1, match.winner, category, rIdx, mIdx, 'p2', isLatestRound);
-                roundHtml += `<div class="match" style="width:200px;">${p1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${p2Html}</div>`;
-            });
-            roundHtml += '</div>';
-            roundDiv.innerHTML = roundHtml;
-            container.appendChild(roundDiv);
-        });
-
-        // Update Beginner Playoff Dropdowns
-        if (category === 'beginner') {
-            const p1Select = document.getElementById('begPlayoffP1');
-            const p2Select = document.getElementById('begPlayoffP2');
-            if (p1Select) {
-                p1Select.innerHTML = ''; p2Select.innerHTML = '';
-                const allP = allUsers.filter(u => u.category === category);
-                allP.forEach(p => { 
-                    p1Select.add(new Option(p.name, JSON.stringify(p))); 
-                    p2Select.add(new Option(p.name, JSON.stringify(p))); 
-                });
-            }
-            
-            // Render Beginner Playoff Matches
-            const poContainer = document.getElementById('beginner-playoff-matches');
-            if(poContainer) {
-                poContainer.innerHTML = '';
-                playoffs.forEach((match, idx) => {
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match'; matchDiv.style.margin = '5px 10px';
-                    const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, `${category}_playoff`, 'playoff', idx, 'p1');
-                    const p2Html = createPlayerHtml(match.p2, match.p1, match.winner, `${category}_playoff`, 'playoff', idx, 'p2');
-                    let delBtn = isAdmin ? `<button onclick="deletePlayoff('${category}', ${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
-                    matchDiv.innerHTML = `${delBtn}${p1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${p2Html}`;
-                    poContainer.appendChild(matchDiv);
-                });
-            }
-        }
-
-        // Calculate Standings
-        const participants = allUsers.filter(u => u.category === category);
+        // 已被刪除或換組的選手，已打完的成績仍要算進去
         const stats = {};
-        participants.forEach(p => stats[p.id] = { name: p.name, wins: 0, opponents: [], id: p.id, playoffStatus: null });
-
-        rounds.forEach(round => {
-            round.forEach(m => {
-                if (m.winner) {
-                    if (stats[m.winner]) stats[m.winner].wins++;
-                    if (m.p1.id !== 'BYE' && m.p2.id !== 'BYE') {
-                        if(stats[m.p1.id]) stats[m.p1.id].opponents.push(m.p2.id);
-                        if(stats[m.p2.id]) stats[m.p2.id].opponents.push(m.p1.id);
-                    }
-                }
-            });
-        });
-
-        playoffs.forEach(m => {
-            if(m.winner) {
-                if(stats[m.winner]) stats[m.winner].playoffStatus = 'win';
-                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
-                if(stats[loserId]) stats[loserId].playoffStatus = 'loss';
+        const addPlayer = p => { if (p.id !== 'BYE' && !stats[p.id]) stats[p.id] = { id: p.id, name: nameOf(p), wins: 0, opponents: [], playoffStatus: null }; };
+        categoryUsers(category).forEach(addPlayer);
+        const allMatches = rounds.flat();
+        allMatches.forEach(m => { addPlayer(m.p1); addPlayer(m.p2); });
+        allMatches.forEach(m => {
+            if (!m.winner) return;
+            if (stats[m.winner]) stats[m.winner].wins++;
+            if (m.p1.id !== 'BYE' && m.p2.id !== 'BYE') {
+                stats[m.p1.id].opponents.push(m.p2.id);
+                stats[m.p2.id].opponents.push(m.p1.id);
             }
         });
+        applyPlayoffStatus(stats, playoffs);
+        const list = Object.values(stats).map(s => ({ ...s, sos: s.opponents.reduce((acc, id) => acc + stats[id].wins, 0) }));
+        const standings = rankStandings(list, allMatches, playoffs);
 
-        const standings = Object.values(stats).map(s => {
-            const sos = s.opponents.reduce((acc, oppId) => acc + (stats[oppId] ? stats[oppId].wins : 0), 0);
-            return { ...s, sos };
-        });
-
-        standings.sort((a, b) => {
-            if (b.wins !== a.wins) return b.wins - a.wins;
-            // Check Playoff
-            const playoffMatch = playoffs.find(m => (m.p1.id === a.id && m.p2.id === b.id) || (m.p1.id === b.id && m.p2.id === a.id));
-            if (playoffMatch && playoffMatch.winner) return (playoffMatch.winner === a.id) ? -1 : 1;
-            
-            if (b.sos !== a.sos) return b.sos - a.sos; // 比輔分
-
-            // 比對戰勝負 (Head-to-Head)
-            for(const round of rounds) {
-                const match = round.find(m => (m.p1.id === a.id && m.p2.id === b.id) || (m.p1.id === b.id && m.p2.id === a.id));
-                if (match && match.winner) {
-                    return (match.winner === a.id) ? -1 : 1;
-                }
-            }
-            return 0;
-        });
-
-        const tbody = document.getElementById(`${category}-standings-body`);
-        if(tbody) {
-            tbody.innerHTML = '';
-            standings.forEach((s, idx) => {
-                let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
-                const opponentsName = s.opponents.map(oid => stats[oid]?.name).join(', ');
-                let note = s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>' : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
-                tbody.innerHTML += `<tr><td class="${rankClass}">#${idx+1}</td><td>${s.name}</td><td>${s.wins}</td><td>${s.sos}</td><td>${note}</td><td style="font-size:0.8em; color:#666;">${opponentsName}</td></tr>`;
-            });
-        }
+        document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>主分 (勝場)</th><th>輔分 (SOS)</th><th>備註</th><th>對戰紀錄</th></tr>';
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map((s, idx) =>
+            `<tr><td class="${rankClass(idx)}">#${idx + 1}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
     }
 
-    // --- Render Round Robin ---
-    function renderRoundRobinUI(data) {
-        if (data.type !== 'round-robin') return;
+    function renderRoundRobin(category, data) {
         const participants = data.participants || [];
         const matches = data.matches || [];
         const playoffs = data.playoffs || [];
 
-        const p1Select = document.getElementById('advPlayoffP1');
-        const p2Select = document.getElementById('advPlayoffP2');
-        if (p1Select) {
-            p1Select.innerHTML = ''; p2Select.innerHTML = '';
-            participants.forEach(p => { 
-                p1Select.add(new Option(p.name, JSON.stringify(p))); 
-                p2Select.add(new Option(p.name, JSON.stringify(p))); 
-            });
-        }
-
-        const poContainer = document.getElementById('advanced-playoff-matches');
-        if(poContainer) {
-            poContainer.innerHTML = '';
-            playoffs.forEach((match, idx) => {
-                const matchDiv = document.createElement('div');
-                matchDiv.className = 'match'; matchDiv.style.margin = '5px 10px';
-                const p1Html = createPlayerHtml(match.p1, match.p2, match.winner, 'advanced_playoff', 'playoff', idx, 'p1');
-                const p2Html = createPlayerHtml(match.p2, match.p1, match.winner, 'advanced_playoff', 'playoff', idx, 'p2');
-                let delBtn = isAdmin ? `<button onclick="deletePlayoff('advanced', ${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
-                matchDiv.innerHTML = `${delBtn}${p1Html}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${p2Html}`;
-                poContainer.appendChild(matchDiv);
-            });
+        // 名單和對戰表不一致時提醒管理員
+        const inBracket = new Set(participants.map(p => p.id));
+        const missing = categoryUsers(category).filter(u => !inBracket.has(u.id));
+        if (isAdmin && missing.length > 0) {
+            document.getElementById(`${category}-notice`).innerHTML =
+                `<p style="color:#c0392b; font-weight:bold;">⚠️ 這些人是對戰表產生後才加入的，還沒有排入賽程：${esc(missing.map(u => u.name).join('、'))}。要加入請按「重新產生」（已有成績會清除）。</p>`;
         }
 
         const stats = {};
-        participants.forEach(p => stats[p.id] = { name: p.name, wins: 0, losses: 0, id: p.id, playoffStatus: null });
-
+        participants.forEach(p => { stats[p.id] = { id: p.id, name: nameOf(p), wins: 0, losses: 0, playoffStatus: null }; });
         matches.forEach(m => {
-            if (m.winner) {
-                stats[m.winner].wins++;
-                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
-                stats[loserId].losses++;
-            }
+            if (!m.winner) return;
+            const loserId = m.winner === m.p1.id ? m.p2.id : m.p1.id;
+            if (stats[m.winner]) stats[m.winner].wins++;
+            if (stats[loserId]) stats[loserId].losses++;
         });
+        applyPlayoffStatus(stats, playoffs);
+        const standings = rankStandings(Object.values(stats), matches, playoffs);
 
-        playoffs.forEach(m => {
-            if(m.winner) {
-                if(stats[m.winner]) stats[m.winner].playoffStatus = 'win';
-                const loserId = (m.winner === m.p1.id) ? m.p2.id : m.p1.id;
-                if(stats[loserId]) stats[loserId].playoffStatus = 'loss';
-            }
-        });
+        document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>勝</th><th>敗</th><th>勝率</th><th>備註</th></tr>';
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map((s, idx) => {
+            const total = s.wins + s.losses;
+            const winRate = total > 0 ? Math.round(s.wins / total * 100) + '%' : '-';
+            return `<tr><td class="${rankClass(idx)}">#${idx + 1}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s)}</td></tr>`;
+        }).join('');
 
-        const sortedStats = Object.values(stats).sort((a, b) => {
-            if (b.wins !== a.wins) return b.wins - a.wins;
-            const directMatch = matches.find(m => (m.p1.id === a.id && m.p2.id === b.id) || (m.p1.id === b.id && m.p2.id === a.id));
-            if (directMatch && directMatch.winner) {
-                if (directMatch.winner === a.id) return -1;
-                if (directMatch.winner === b.id) return 1;
-            }
-            const playoffMatch = playoffs.find(m => (m.p1.id === a.id && m.p2.id === b.id) || (m.p1.id === b.id && m.p2.id === a.id));
-            if (playoffMatch && playoffMatch.winner) return (playoffMatch.winner === a.id) ? -1 : 1;
-            return 0;
-        });
-
-        const standingsBody = document.getElementById('advanced-standings-body');
-        if(standingsBody) {
-            standingsBody.innerHTML = '';
-            sortedStats.forEach((s, idx) => {
-                let rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
-                const winRate = (s.wins + s.losses) > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) + '%' : '-';
-                let note = s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>' : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
-                standingsBody.innerHTML += `<tr><td class="${rankClass}">#${idx + 1}</td><td>${s.name}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${note}</td></tr>`;
+        let grid = '<h3>⚔️ 對戰矩陣</h3><p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。管理員可點擊格子切換：勝 -> 敗 -> 未戰)</p><div style="overflow-x:auto;"><table class="rr-grid" border="1" style="border-collapse:collapse; width:100%; min-width:600px;"><tr><th style="background:#eee;">選手</th>';
+        participants.forEach(p => { grid += `<th style="background:#eee;">${esc(nameOf(p))}</th>`; });
+        grid += '</tr>';
+        participants.forEach(rowP => {
+            grid += `<tr><td style="font-weight:bold; background:#fafafa;">${esc(nameOf(rowP))}</td>`;
+            participants.forEach(colP => {
+                if (rowP.id === colP.id) { grid += '<td class="rr-cell-self"></td>'; return; }
+                const matchIndex = matches.findIndex(m => isSamePair(m, rowP.id, colP.id));
+                if (matchIndex === -1) { grid += '<td>-</td>'; return; }
+                const winner = matches[matchIndex].winner;
+                let cellClass = !winner ? 'rr-cell-play' : winner === rowP.id ? 'rr-cell-win' : 'rr-cell-loss';
+                const text = !winner ? '未戰' : winner === rowP.id ? '勝' : '敗';
+                if (isAdmin) cellClass += ' rr-cell-clickable';
+                const onClick = isAdmin ? `onclick="toggleRRWinner('${category}', ${matchIndex}, ${jsArg(rowP.id)})"` : '';
+                grid += `<td class="${cellClass}" ${onClick}>${text}</td>`;
             });
-        }
-
-        const gridArea = document.getElementById('advanced-grid-area');
-        if(gridArea) {
-            let gridHtml = '<table class="rr-grid" border="1" style="border-collapse:collapse; width:100%; min-width:600px;"><tr><th style="background:#eee;">選手</th>';
-            participants.forEach(p => gridHtml += `<th style="background:#eee;">${p.name}</th>`);
-            gridHtml += '</tr>';
-            participants.forEach((rowP, i) => {
-                gridHtml += `<tr><td style="font-weight:bold; background:#fafafa;">${rowP.name}</td>`;
-                participants.forEach((colP, j) => {
-                    if (rowP.id === colP.id) {
-                        gridHtml += '<td class="rr-cell-self"></td>';
-                    } else {
-                        const matchIndex = matches.findIndex(m => (m.p1.id === rowP.id && m.p2.id === colP.id) || (m.p1.id === colP.id && m.p2.id === rowP.id));
-                        if (matchIndex === -1) { gridHtml += '<td>Error</td>'; } else {
-                            const match = matches[matchIndex];
-                            let cellContent = '-'; let cellClass = '';
-                            let onClick = isAdmin ? `onclick="window.toggleRRWinner(${matchIndex}, '${rowP.id}')"` : '';
-                            if (match.winner) {
-                                if (match.winner === rowP.id) { cellContent = '勝'; cellClass = 'rr-cell-win'; } 
-                                else { cellContent = '敗'; cellClass = 'rr-cell-loss'; }
-                            } else { cellContent = '未戰'; cellClass = 'rr-cell-play'; }
-                            if (isAdmin) cellClass += ' rr-cell-clickable';
-                            gridHtml += `<td class="${cellClass}" ${onClick}>${cellContent}</td>`;
-                        }
-                    }
-                });
-                gridHtml += '</tr>';
-            });
-            gridHtml += '</table>';
-            gridArea.innerHTML = gridHtml;
-        }
+            grid += '</tr>';
+        });
+        document.getElementById(`${category}-grid`).innerHTML = grid + '</table></div>';
     }
 
-    // --- Interaction ---
-    function createPlayerHtml(player, opponent, matchWinnerId, category, rIdx, mIdx, slot, isLatest = true) {
+    // mode: latest(瑞士制最新輪) / history(瑞士制舊輪) / playoff(加賽)；playoff 時 rIdx 是加賽索引
+    function createPlayerHtml(player, opponent, winnerId, category, rIdx, mIdx, mode) {
         let classes = 'player';
         let badge = '';
         if (player.id === 'BYE') classes += ' bye-text';
-        if (matchWinnerId) {
-            if (matchWinnerId === player.id) { 
-                classes += ' winner'; 
-                // 修改：WIN -> 勝
-                badge = '<span class="status-badge status-win">勝</span>'; 
-            }
+        if (winnerId) {
+            if (winnerId === player.id) { classes += ' winner'; badge = '<span class="status-badge status-win">勝</span>'; }
             else classes += ' loser';
-        } else if (player.id !== 'BYE' && category !== 'advanced_playoff' && !category.includes('playoff')) {
+        } else if (player.id !== 'BYE' && mode !== 'playoff') {
             badge = '<span class="status-badge">待輸入</span>';
         }
-        
         let clickAction = '';
         if (isAdmin) {
-            if (category === 'beginner') { 
-                if (!isLatest) {
-                    classes += ' locked';
-                    clickAction = `onclick="alert('⚠️ 無法修改歷史輪次的成績！\\n若需修正，請點擊上方的「刪除最後一輪」按鈕回溯。')"`
-                } else {
-                    if (!matchWinnerId && player.id !== 'BYE') {
-                        classes += ' clickable';
-                        clickAction = `onclick="window.setSwissWinner('${category}', ${rIdx}, ${mIdx}, '${player.id}')"`;
-                    } else if (matchWinnerId && matchWinnerId === player.id && opponent.id !== 'BYE') {
-                        classes += ' undoable';
-                        clickAction = `onclick="window.resetSwissMatch('${category}', ${rIdx}, ${mIdx})"`;
-                    }
+            if (mode === 'history') {
+                classes += ' locked';
+                clickAction = `onclick="alert('⚠️ 無法修改歷史輪次的成績！\\n若需修正，請點擊上方的「刪除最後一輪」按鈕回溯。')"`;
+            } else if (mode === 'latest') {
+                if (!winnerId && player.id !== 'BYE') {
+                    classes += ' clickable';
+                    clickAction = `onclick="setSwissWinner('${category}', ${rIdx}, ${mIdx}, ${jsArg(player.id)})"`;
+                } else if (winnerId === player.id && opponent.id !== 'BYE') {
+                    classes += ' undoable';
+                    clickAction = `onclick="resetSwissMatch('${category}', ${rIdx}, ${mIdx})"`;
                 }
-            } else if (category.includes('playoff')) {
-                if (!matchWinnerId || (matchWinnerId === player.id)) {
-                     classes += ' clickable';
-                     clickAction = `onclick="setPlayoffWinner('${category.split('_')[0]}', ${mIdx}, '${player.id}')"`;
-                }
+            } else if (!winnerId || winnerId === player.id) {
+                classes += ' clickable';
+                clickAction = `onclick="setPlayoffWinner('${category}', ${rIdx}, ${jsArg(player.id)})"`;
             }
         }
-        return `<div class="${classes}" ${clickAction}><span>${player.name || '-'}</span>${badge}</div>`;
+        const name = player.id === 'BYE' ? '輪空' : nameOf(player);
+        return `<div class="${classes}" ${clickAction}><span>${esc(name) || '-'}</span>${badge}</div>`;
     }
 
-    // Global Action Functions
+    // 7. 操作
     window.setSwissWinner = function(category, rIdx, mIdx, winnerId) {
         if (!isAdmin || !confirm("確認勝負？")) return;
-        db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: winnerId });
-    }
-    
+        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: winnerId }));
+    };
     window.resetSwissMatch = function(category, rIdx, mIdx) {
         if (!isAdmin || !confirm("確定要重置這場比賽嗎？")) return;
-        db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: null });
-    }
-
-    window.toggleRRWinner = function(matchIndex, clickedPlayerId) {
+        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: null }));
+    };
+    window.toggleRRWinner = function(category, matchIndex, clickedPlayerId) {
         if (!isAdmin) return;
-        if (!bracketData.advanced || !bracketData.advanced.matches) return;
-        const match = bracketData.advanced.matches[matchIndex];
+        const data = bracketData[category];
+        if (!data || !data.matches) return;
+        const match = data.matches[matchIndex];
         let newWinner = null;
         if (!match.winner) newWinner = clickedPlayerId;
-        else if (match.winner === clickedPlayerId) newWinner = (match.p1.id === clickedPlayerId) ? match.p2.id : match.p1.id;
-        else newWinner = null;
-        db.ref(`tournament/advanced/matches/${matchIndex}`).update({ winner: newWinner });
+        else if (match.winner === clickedPlayerId) newWinner = match.p1.id === clickedPlayerId ? match.p2.id : match.p1.id;
+        write(db.ref(`tournament/${category}/matches/${matchIndex}`).update({ winner: newWinner }));
     };
-
-    // Advanced Playoff Actions
-    window.addPlayoffMatch = function() {
-        const p1Val = document.getElementById('advPlayoffP1').value;
-        const p2Val = document.getElementById('advPlayoffP2').value;
-        if (!p1Val || !p2Val) return;
-        const p1Data = JSON.parse(p1Val);
-        const p2Data = JSON.parse(p2Val);
-        if (p1Data.id === p2Data.id) { alert("不能選擇同一人對戰"); return; }
-        let playoffs = bracketData.advanced.playoffs || [];
-        playoffs.push({ p1: p1Data, p2: p2Data, winner: null });
-        db.ref(`tournament/advanced/playoffs`).set(playoffs);
-    }
-
-    // Beginner Playoff Actions (New)
-    window.addBeginnerPlayoffMatch = function() {
-        const p1Val = document.getElementById('begPlayoffP1').value;
-        const p2Val = document.getElementById('begPlayoffP2').value;
-        if (!p1Val || !p2Val) return;
-        const p1Data = JSON.parse(p1Val);
-        const p2Data = JSON.parse(p2Val);
-        if (p1Data.id === p2Data.id) { alert("不能選擇同一人對戰"); return; }
-        let playoffs = bracketData.beginner.playoffs || [];
-        playoffs.push({ p1: p1Data, p2: p2Data, winner: null });
-        db.ref(`tournament/beginner/playoffs`).set(playoffs);
-    }
-
+    window.addPlayoffMatch = function(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const p1Id = document.getElementById(`${category}-playoff-p1`).value;
+        const p2Id = document.getElementById(`${category}-playoff-p2`).value;
+        if (!data || !p1Id || !p2Id) return;
+        if (p1Id === p2Id) { alert("不能選擇同一人對戰"); return; }
+        const toPlayer = id => ({ id, name: nameOf({ id, name: '' }) });
+        write(db.ref(`tournament/${category}/playoffs`).set([...(data.playoffs || []), { p1: toPlayer(p1Id), p2: toPlayer(p2Id), winner: null }]));
+    };
     window.setPlayoffWinner = function(category, matchIdx, winnerId) {
         if (!isAdmin || !confirm("確認加賽勝負？")) return;
         const match = bracketData[category].playoffs[matchIdx];
-        let newWinner = winnerId;
-        if (match.winner === winnerId) newWinner = null;
-        db.ref(`tournament/${category}/playoffs/${matchIdx}`).update({ winner: newWinner });
-    }
-
+        write(db.ref(`tournament/${category}/playoffs/${matchIdx}`).update({ winner: match.winner === winnerId ? null : winnerId }));
+    };
     window.deletePlayoff = function(category, idx) {
-        if(!confirm("確定刪除這場加賽？")) return;
-        let playoffs = bracketData[category].playoffs;
-        playoffs.splice(idx, 1);
-        db.ref(`tournament/${category}/playoffs`).set(playoffs);
-    }
+        if (!isAdmin || !confirm("確定刪除這場加賽？")) return;
+        write(db.ref(`tournament/${category}/playoffs`).set(bracketData[category].playoffs.filter((_, i) => i !== idx)));
+    };
 
-    // Beginner Playoff Delete (Specific wrapper)
-    window.deleteBeginnerPlayoff = function(idx) {
-        deletePlayoff('beginner', idx);
-    }
-
-    // =======================================================
-    // 3. 啟動邏輯 (移到最底端)
-    // =======================================================
-    
-    // 管理員登入事件
-    document.getElementById('appTitle').addEventListener('click', async () => {
+    // 8. 啟動
+    document.getElementById('appTitle').addEventListener('click', () => {
         clickCount++;
-        if (clickCount >= 16) {
-            clickCount = 0; // 馬上重置，防止累積
-            
-            if (isAdmin) {
-                if(confirm("您已是管理員，要登出嗎？")) logout();
-                return;
-            } 
-            
-            const pwd = prompt("請輸入管理員密碼：");
-            if (pwd) {
-                try {
-                    const inputToken = btoa(pwd + "GoClub");
-                    if (inputToken === targetToken) {
-                        enableAdminMode();
-                        alert("管理員模式已開啟");
-                    } else {
-                        alert("密碼錯誤");
-                    }
-                } catch(e) {
-                    alert("驗證錯誤，請確認輸入僅包含英數字");
-                }
+        if (clickCount < 16) return;
+        clickCount = 0;
+        if (isAdmin) {
+            if (confirm("您已是管理員，要登出嗎？")) logout();
+            return;
+        }
+        const pwd = prompt("請輸入管理員密碼：");
+        if (!pwd) return;
+        try {
+            if (btoa(pwd + "GoClub") === targetToken) {
+                enableAdminMode();
+                alert("管理員模式已開啟");
+            } else {
+                alert("密碼錯誤");
             }
+        } catch (e) {
+            alert("驗證錯誤，請確認輸入僅包含英數字");
         }
     });
 
-    if (localStorage.getItem('goClubAdmin') === 'true') {
-        enableAdminMode();
-    }
+    if (localStorage.getItem('goClubAdmin') === 'true') enableAdminMode();
+    refreshBrackets();
 
-    db.ref('config/registrationOpen').on('value', (snapshot) => {
+    db.ref('config/registrationOpen').on('value', snapshot => {
         const val = snapshot.val();
-        isRegistrationOpen = (val === null) ? true : val;
+        isRegistrationOpen = val === null ? true : val;
         updateRegistrationUI();
     });
 
-    db.ref(`tournament/beginner`).on('value', snapshot => {
-        const data = snapshot.val();
-        bracketData.beginner = data;
-        // 如果 user 列表已經有資料，就渲染；否則等 user 列表載入後再渲染
-        if (data) { 
-            renderSwissUI('beginner', data); 
-        } else {
-            // 清空畫面
-            const container = document.getElementById('beginner-swiss-rounds');
-            if(container) container.innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>'; 
-            const standings = document.getElementById('beginner-standings-body');
-            if(standings) standings.innerHTML = '';
-            const playoff = document.getElementById('beginner-playoff-matches');
-            if(playoff) playoff.innerHTML = ''; 
-        }
+    Object.keys(CATEGORIES).forEach(category => {
+        db.ref(`tournament/${category}`).on('value', snapshot => {
+            bracketData[category] = snapshot.val();
+            renderBracket(category);
+        });
     });
 
-    db.ref(`tournament/advanced`).on('value', snapshot => {
+    db.ref('users').on('value', snapshot => {
         const data = snapshot.val();
-        bracketData.advanced = data;
-        if (data) { 
-            renderRoundRobinUI(data); 
-        } else {
-            // 清空畫面
-            const grid = document.getElementById('advanced-grid-area');
-            if(grid) grid.innerHTML = '<p style="padding:20px; color:#666;">尚未產生對戰表</p>'; 
-            const standings = document.getElementById('advanced-standings-body');
-            if(standings) standings.innerHTML = ''; 
-            const playoff = document.getElementById('advanced-playoff-matches');
-            if(playoff) playoff.innerHTML = '';
-        }
-    });
-
-    db.ref('users').on('value', (snapshot) => {
-        const data = snapshot.val();
-        allUsers = [];
-        if (data) Object.keys(data).forEach(key => allUsers.push({ id: key, ...data[key] }));
-        
-        // 關鍵修正：資料更新後，強制刷新賽程，確保戰績榜出現
+        allUsers = data ? Object.keys(data).map(key => ({ ...data[key], id: key })) : [];
         renderList();
-        refreshBrackets(); 
+        refreshBrackets();
     });
 </script>
 
