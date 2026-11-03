@@ -84,6 +84,11 @@
         .tag { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.9em; display: inline-block; font-weight: bold; text-align: center; min-width: 60px;}
         .tag-beginner { background-color: #27ae60; }
         .tag-advanced { background-color: #c0392b; }
+        .tag-capture { background-color: #2471a3; }
+        .group-row td { background: #e8edf2; font-weight: bold; color: #2c3e50; }
+        .cat-choices label { display: block; font-weight: normal; padding: 8px 0; cursor: pointer; }
+        .cat-choices input { width: auto; margin-right: 6px; }
+        .rule-note { color: #2471a3; font-weight: bold; margin: 10px 0; }
         .time-text { font-size: 0.85em; color: #666; }
 
         /* Admin Mode */
@@ -140,8 +145,8 @@
             .container { padding: 12px; border-radius: 0; box-shadow: none; }
             h1 { font-size: 1.4em; margin: 8px 0 12px; }
             h2 { font-size: 1.15em; }
-            .tabs { gap: 3px; }
-            .tab { padding: 10px 4px; white-space: nowrap; flex: 1 1 auto; text-align: center; font-size: 0.88em; }
+            .tabs { gap: 3px; flex-wrap: wrap; }
+            .tab { padding: 10px 4px; white-space: nowrap; flex: 1 1 30%; margin-right: 0; text-align: center; font-size: 0.88em; }
             input, select { font-size: 16px; }
             button { padding: 10px 14px; font-size: 15px; }
             button.admin-btn { margin: 4px 4px 0 0; }
@@ -171,8 +176,9 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('register')">報名頁面</div>
         <div class="tab" onclick="switchTab('list')">報名名單</div>
-        <div class="tab" onclick="switchTab('bracket-beginner')">入門組 13路</div>
-        <div class="tab" onclick="switchTab('bracket-advanced')">進階組 19路</div>
+        <div class="tab" onclick="switchTab('bracket-beginner')">13路圍地</div>
+        <div class="tab" onclick="switchTab('bracket-advanced')">19路圍地</div>
+        <div class="tab" onclick="switchTab('bracket-capture')">吃子</div>
     </div>
 
     <div id="register" class="tab-content active">
@@ -191,11 +197,13 @@
 
         <div id="registrationForm" class="form-narrow">
             <div class="form-group">
-                <label>組別</label>
-                <select id="regCategory">
-                    <option value="beginner">入門組 (13路)</option>
-                    <option value="advanced">進階組 (19路)</option>
-                </select>
+                <label>組別（可複選）</label>
+                <div class="cat-choices">
+                    <label><input type="checkbox" name="regCategory" value="beginner"> 13路圍地</label>
+                    <label><input type="checkbox" name="regCategory" value="advanced"> 19路圍地</label>
+                    <label><input type="checkbox" name="regCategory" value="capture"> 吃子 <span class="time-text">（9 路，先吃 5 子獲勝）</span></label>
+                </div>
+                <div class="time-text" style="margin-top:6px;">已報名想加報其他組：填相同姓名和工號，只勾新的組別。要退出請找管理員。</div>
             </div>
             <div class="form-group">
                 <label>姓名</label>
@@ -231,7 +239,7 @@
 
     <div id="bracket-beginner" class="tab-content">
         <div class="bracket-head">
-            <h2 id="beginner-title">入門組 13路 對戰表</h2>
+            <h2 id="beginner-title">13路圍地 對戰表</h2>
             <div>
                 <span id="beginner-swiss-actions" style="display:none;">
                     <button class="admin-btn warning" onclick="deleteLastSwissRound('beginner')">🔙 刪除最後一輪</button>
@@ -259,14 +267,14 @@
 
         <div id="beginner-content" style="display:none;">
             <div id="beginner-rounds"></div>
-            <h3>🏆 入門組 戰績排行榜</h3>
+            <h3>🏆 13路圍地 戰績排行榜</h3>
             <div class="table-wrap"><table class="rr-standings">
                 <thead id="beginner-standings-head"></thead>
                 <tbody id="beginner-standings-body"></tbody>
             </table></div>
             <div id="beginner-grid"></div>
             <div class="playoff-area">
-                <h3>🔥 入門組 加賽區 (同分無法分出名次時使用)</h3>
+                <h3>🔥 13路圍地 加賽區 (同分無法分出名次時使用)</h3>
                 <div class="playoff-controls">
                     <label>新增場次：</label>
                     <select id="beginner-playoff-p1"></select> VS <select id="beginner-playoff-p2"></select>
@@ -279,7 +287,7 @@
 
     <div id="bracket-advanced" class="tab-content">
         <div class="bracket-head">
-            <h2 id="advanced-title">進階組 19路 對戰表</h2>
+            <h2 id="advanced-title">19路圍地 對戰表</h2>
             <div>
                 <span id="advanced-swiss-actions" style="display:none;">
                     <button class="admin-btn warning" onclick="deleteLastSwissRound('advanced')">🔙 刪除最後一輪</button>
@@ -307,20 +315,69 @@
 
         <div id="advanced-content" style="display:none;">
             <div id="advanced-rounds"></div>
-            <h3>🏆 進階組 戰績排行榜</h3>
+            <h3>🏆 19路圍地 戰績排行榜</h3>
             <div class="table-wrap"><table class="rr-standings">
                 <thead id="advanced-standings-head"></thead>
                 <tbody id="advanced-standings-body"></tbody>
             </table></div>
             <div id="advanced-grid"></div>
             <div class="playoff-area">
-                <h3>🔥 進階組 加賽區 (同分無法分出名次時使用)</h3>
+                <h3>🔥 19路圍地 加賽區 (同分無法分出名次時使用)</h3>
                 <div class="playoff-controls">
                     <label>新增場次：</label>
                     <select id="advanced-playoff-p1"></select> VS <select id="advanced-playoff-p2"></select>
                     <button onclick="addPlayoffMatch('advanced')">新增</button>
                 </div>
                 <div id="advanced-playoff-matches" class="playoff-matches-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="bracket-capture" class="tab-content">
+        <div class="bracket-head">
+            <h2 id="capture-title">吃子 對戰表</h2>
+            <div>
+                <span id="capture-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('capture')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('capture')">➕ 產生下一輪</button>
+                </span>
+                <span id="capture-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('capture')">重新產生</button>
+                </span>
+                <button class="admin-btn danger" onclick="clearBracket('capture')">🗑️ 清空賽程</button>
+            </div>
+        </div>
+
+        <p class="rule-note">🎯 吃子組規則：9 路棋盤，先吃 5 子獲勝。</p>
+        <div id="capture-format-panel" class="format-panel" style="display:none;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="capture-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('capture')">產生對戰表</button>
+        </div>
+        <p id="capture-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="capture-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="capture-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="capture-notice"></div>
+
+        <div id="capture-content" style="display:none;">
+            <div id="capture-rounds"></div>
+            <h3>🏆 吃子 戰績排行榜</h3>
+            <div class="table-wrap"><table class="rr-standings">
+                <thead id="capture-standings-head"></thead>
+                <tbody id="capture-standings-body"></tbody>
+            </table></div>
+            <div id="capture-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 吃子 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="capture-playoff-p1"></select> VS <select id="capture-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('capture')">新增</button>
+                </div>
+                <div id="capture-playoff-matches" class="playoff-matches-container"></div>
             </div>
         </div>
     </div>
@@ -342,17 +399,19 @@
     let isAdmin = false;
     let isRegistrationOpen = true;
     let allUsers = [];
-    let bracketData = { beginner: null, advanced: null };
+    let bracketData = { beginner: null, advanced: null, capture: null };
 
     const CATEGORIES = {
-        beginner: { label: '入門組', board: '13路' },
-        advanced: { label: '進階組', board: '19路' }
+        beginner: { label: '13路圍地' },
+        advanced: { label: '19路圍地' },
+        capture: { label: '吃子' }
     };
     const FORMATS = { 'swiss': '瑞士制', 'round-robin': '循環賽' };
 
     const ADMIN_UID = "oweTRJacR0XO4tbKjvRZqhaoHbr1";
     let publicUsers = null;
     let privateUsers = {};
+    let privateLoaded = false;
 
     const firebaseConfig = {
         apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
@@ -405,10 +464,13 @@
         if (enabled) {
             privateRef.on('value', snapshot => {
                 privateUsers = snapshot.val() || {};
+                privateLoaded = true;
                 rebuildUsers();
             }, showDbError);
         } else {
             privateUsers = {};
+            privateLoaded = false;
+            empIndexSynced = false;
         }
         updateRegistrationUI();
         rebuildUsers();
@@ -426,10 +488,34 @@
         if (panel) panel.style.display = (isAdmin && allUsers.some(u => u.legacyEmpId)) ? 'block' : 'none';
         renderList();
         refreshBrackets();
+        syncEmpIndex();
     }
 
     function empKey(empId) {
         return encodeURIComponent(String(empId).trim().toUpperCase()).replace(/\./g, '%2E');
+    }
+
+    function empIndexKey(category, empId) { return `${category}_${empKey(empId)}`; }
+    function samePerson(a, b) { return !!a.empId && !!b.empId && empKey(a.empId) === empKey(b.empId); }
+
+    // 舊版索引一個工號只有一筆；管理員登入時補成「每組一筆」，才能擋同組重複報名
+    let empIndexSynced = false;
+    function syncEmpIndex() {
+        if (empIndexSynced || !isAdmin || !privateLoaded || publicUsers === null) return;
+        empIndexSynced = true;
+        db.ref('empIndex').once('value').then(snapshot => {
+            const current = snapshot.val() || {};
+            const updates = {};
+            allUsers.filter(u => u.empId).forEach(u => {
+                const key = empIndexKey(u.category, u.empId);
+                if (!current[key]) updates[`empIndex/${key}`] = u.id;
+            });
+            const prefixes = Object.keys(CATEGORIES).map(c => c + '_');
+            Object.keys(current).forEach(key => {
+                if (!prefixes.some(p => key.startsWith(p))) updates[`empIndex/${key}`] = null;
+            });
+            if (Object.keys(updates).length) return db.ref().update(updates);
+        }).catch(showDbError);
     }
 
     function logout() { auth.signOut().catch(showDbError); }
@@ -458,7 +544,7 @@
         const updates = {};
         targets.forEach(u => {
             updates[`userPrivate/${u.id}/empId`] = u.legacyEmpId;
-            updates[`empIndex/${empKey(u.legacyEmpId)}`] = u.id;
+            updates[`empIndex/${empIndexKey(u.category, u.legacyEmpId)}`] = u.id;
             updates[`users/${u.id}/empId`] = null;
         });
         write(db.ref().update(updates).then(() => alert("搬移完成")));
@@ -485,7 +571,7 @@
     function switchTab(tabId) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced'];
+        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced', 'bracket-capture'];
         document.querySelectorAll('.tab')[tabs.indexOf(tabId)].classList.add('active');
         document.getElementById(tabId).classList.add('active');
     }
@@ -494,31 +580,41 @@
         if (!isRegistrationOpen && !isAdmin) { alert("抱歉，報名已截止。"); return; }
         const name = document.getElementById('regName').value.trim();
         const empId = document.getElementById('regEmpId').value.trim();
-        const category = document.getElementById('regCategory').value;
+        const boxes = [...document.querySelectorAll('input[name="regCategory"]')];
+        const categories = boxes.filter(b => b.checked).map(b => b.value);
         if (!name || !empId) { alert("請填寫完整資訊"); return; }
-        const id = db.ref('users').push().key;
+        if (!categories.length) { alert("請至少勾選一個組別"); return; }
+        if (isAdmin) {
+            const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, { empId })));
+            if (dup) { alert(`此工號已報名【${CATEGORIES[dup].label}】`); return; }
+        }
+        const timestamp = new Date().toISOString();
         const updates = {};
-        updates[`users/${id}`] = { name, category, timestamp: new Date().toISOString() };
-        updates[`userPrivate/${id}`] = { empId };
-        updates[`empIndex/${empKey(empId)}`] = id;
+        categories.forEach(category => {
+            const id = db.ref('users').push().key;
+            updates[`users/${id}`] = { name, category, timestamp };
+            updates[`userPrivate/${id}`] = { empId };
+            updates[`empIndex/${empIndexKey(category, empId)}`] = id;
+        });
         db.ref().update(updates)
             .then(() => {
                 alert("報名成功！");
                 document.getElementById('regName').value = '';
                 document.getElementById('regEmpId').value = '';
+                boxes.forEach(b => { b.checked = false; });
                 switchTab('list');
             })
-            .catch(() => alert("報名失敗：此工號可能已報名過，或報名已截止。"));
+            .catch(() => alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別），或報名已截止。"));
     }
 
     function renderList() {
         const tbody = document.getElementById('registrantsTable');
         if (!tbody) return;
-        const rows = [...allUsers].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(user => {
+        const rowHtml = user => {
             const dateStr = new Date(user.timestamp).toLocaleString('zh-TW');
             const id = jsArg(user.id);
-            const catClass = user.category === 'beginner' ? 'tag-beginner' : 'tag-advanced';
-            const catInfo = CATEGORIES[user.category] || { label: user.category, board: '' };
+            const catClass = `tag-${user.category}`;
+            const catInfo = CATEGORIES[user.category] || { label: user.category };
             const categoryHtml = isAdmin ?
                 `<select class="admin-select" onchange="updateUser(${id}, 'category', this.value, this)">
                     ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''}>${CATEGORIES[c].label}</option>`).join('')}
@@ -533,8 +629,12 @@
                 <td class="time-text nowrap col-time">${esc(dateStr)}</td>
                 <td class="admin-action"><button class="danger" onclick="deleteUser(${id})">刪除</button></td>
             </tr>`;
-        });
-        tbody.innerHTML = rows.join('');
+        };
+        tbody.innerHTML = Object.keys(CATEGORIES).map(category => {
+            const members = categoryUsers(category).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (!members.length) return '';
+            return `<tr class="group-row"><td colspan="5">${esc(CATEGORIES[category].label)}（${members.length} 人）</td></tr>` + members.map(rowHtml).join('');
+        }).join('');
     }
 
     function updateUser(id, field, rawValue, inputEl) {
@@ -543,26 +643,46 @@
         const user = allUsers.find(u => u.id === id);
         const restore = () => { if (inputEl && user) inputEl.value = user[field]; };
         if (!value) { alert("不可為空白"); restore(); return; }
-        if (field === 'empId' && allUsers.some(u => u.id !== id && empKey(u.empId) === empKey(value))) { alert("此工號已被其他人使用"); restore(); return; }
-        if (field === 'category' && isInBracket(id) &&
-            !confirm("這位選手已在賽程中。換組後不會被排進之後的輪次，已打完的成績會留在原組別。確定要換組嗎？")) { restore(); return; }
+        if (!user) return;
+        // 同一人報多組時，姓名和工號要一起改
+        const rows = allUsers.filter(u => u.id === id || samePerson(u, user));
         if (field === 'empId') {
-            const updates = { [`userPrivate/${id}/empId`]: value, [`empIndex/${empKey(value)}`]: id };
-            if (user && user.empId && empKey(user.empId) !== empKey(value)) updates[`empIndex/${empKey(user.empId)}`] = null;
-            if (user && user.legacyEmpId) updates[`users/${id}/empId`] = null;
+            const conflict = rows.find(r => allUsers.some(u => !rows.includes(u) && u.category === r.category && samePerson(u, { empId: value })));
+            if (conflict) { alert(`此工號已報名【${CATEGORIES[conflict.category].label}】`); restore(); return; }
+            const updates = {};
+            rows.forEach(r => { if (r.empId) updates[`empIndex/${empIndexKey(r.category, r.empId)}`] = null; });
+            rows.forEach(r => {
+                updates[`userPrivate/${r.id}/empId`] = value;
+                updates[`empIndex/${empIndexKey(r.category, value)}`] = r.id;
+                if (r.legacyEmpId) updates[`users/${r.id}/empId`] = null;
+            });
             write(db.ref().update(updates));
             return;
         }
-        write(db.ref('users/' + id).update({ [field]: value }));
+        if (field === 'category') {
+            if (value === user.category) return;
+            if (allUsers.some(u => u.id !== id && u.category === value && samePerson(u, user))) { alert(`這位選手已報名【${CATEGORIES[value].label}】`); restore(); return; }
+            if (isInBracket(id) && !confirm("這位選手已在賽程中。換組後不會被排進之後的輪次，已打完的成績會留在原組別。確定要換組嗎？")) { restore(); return; }
+            const updates = { [`users/${id}/category`]: value };
+            if (user.empId) {
+                updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
+                updates[`empIndex/${empIndexKey(value, user.empId)}`] = id;
+            }
+            write(db.ref().update(updates));
+            return;
+        }
+        const updates = {};
+        rows.forEach(r => { updates[`users/${r.id}/${field}`] = value; });
+        write(db.ref().update(updates));
     }
 
     function deleteUser(id) {
         if (!isAdmin) return;
         const warning = isInBracket(id) ? "\n\n⚠️ 這位選手已在賽程中！刪除後不會再被配對，已打完的成績仍會保留。" : "";
-        if (!confirm("確定要刪除這位報名者嗎？" + warning)) return;
+        if (!confirm("確定要刪除這筆報名嗎？（只刪這一組）" + warning)) return;
         const user = allUsers.find(u => u.id === id);
         const updates = { [`users/${id}`]: null, [`userPrivate/${id}`]: null };
-        if (user && user.empId) updates[`empIndex/${empKey(user.empId)}`] = null;
+        if (user && user.empId) updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
         write(db.ref().update(updates));
     }
 
@@ -769,7 +889,7 @@
         const info = CATEGORIES[category];
         const el = suffix => document.getElementById(`${category}-${suffix}`);
         const type = data ? data.type : null;
-        el('title').textContent = `${info.label} ${info.board} 對戰表` + (type ? ` (${FORMATS[type]})` : '');
+        el('title').textContent = `${info.label} 對戰表` + (type ? ` (${FORMATS[type]})` : '');
         el('format-panel').style.display = (isAdmin && !data) ? 'block' : 'none';
         el('swiss-actions').style.display = type === 'swiss' ? 'inline' : 'none';
         el('rr-actions').style.display = type === 'round-robin' ? 'inline' : 'none';
