@@ -88,6 +88,7 @@
         .group-row td { background: #e8edf2; font-weight: bold; color: #2c3e50; }
         .cat-choices label { display: block; font-weight: normal; padding: 8px 0; cursor: pointer; }
         .cat-choices input { width: auto; margin-right: 6px; }
+        button:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
         .rule-note { color: #2471a3; font-weight: bold; margin: 10px 0; }
         .time-text { font-size: 0.85em; color: #666; }
 
@@ -445,12 +446,21 @@
         return (m.p1.id === idA && m.p2.id === idB) || (m.p1.id === idB && m.p2.id === idA);
     }
     function categoryUsers(category) { return allUsers.filter(u => u.category === category); }
-    function isInBracket(userId) {
-        return Object.keys(CATEGORIES).some(cat => {
-            const data = bracketData[cat];
-            if (!data) return false;
-            const matches = data.type === 'swiss' ? (data.rounds || []).flat() : (data.matches || []);
-            return matches.some(m => m.p1.id === userId || m.p2.id === userId);
+    // 產生對戰表後該組就鎖定，不能再加入或退出；要改名單得先清空賽程
+    function isLocked(category) { return !!bracketData[category]; }
+    function lockedMessage(category) { return `【${CATEGORIES[category].label}】已產生對戰表，不能加入或退出。\n如需更動，請先清空該組賽程（成績會一併清除）。`; }
+    function updateCategoryLocks() {
+        document.querySelectorAll('input[name="regCategory"]').forEach(box => {
+            const locked = isLocked(box.value);
+            box.disabled = locked;
+            if (locked) box.checked = false;
+            let note = box.parentElement.querySelector('.lock-note');
+            if (locked && !note) {
+                note = document.createElement('span');
+                note.className = 'lock-note time-text';
+                note.textContent = ' （已開賽，不再受理）';
+                box.parentElement.appendChild(note);
+            } else if (!locked && note) note.remove();
         });
     }
 
@@ -584,6 +594,8 @@
         const categories = boxes.filter(b => b.checked).map(b => b.value);
         if (!name || !empId) { alert("請填寫完整資訊"); return; }
         if (!categories.length) { alert("請至少勾選一個組別"); return; }
+        const lockedCategory = categories.find(isLocked);
+        if (lockedCategory) { alert(lockedMessage(lockedCategory)); return; }
         if (isAdmin) {
             const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, { empId })));
             if (dup) { alert(`此工號已報名【${CATEGORIES[dup].label}】`); return; }
@@ -632,8 +644,8 @@
             const catClass = `tag-${user.category}`;
             const catInfo = CATEGORIES[user.category] || { label: user.category };
             const categoryHtml = isAdmin ?
-                `<select class="admin-select" onchange="updateUser(${id}, 'category', this.value, this)">
-                    ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''}>${CATEGORIES[c].label}</option>`).join('')}
+                `<select class="admin-select" ${isLocked(user.category) ? 'disabled' : ''} onchange="updateUser(${id}, 'category', this.value, this)">
+                    ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''} ${user.category !== c && isLocked(c) ? 'disabled' : ''}>${CATEGORIES[c].label}</option>`).join('')}
                 </select>` : `<span class="tag ${catClass}">${esc(catInfo.label)}</span>`;
             const field = (key) => isAdmin
                 ? `<input class="edit-input" value="${esc(user[key])}" onchange="updateUser(${id}, '${key}', this.value, this)">`
@@ -643,7 +655,7 @@
                 <td>${field('name')}</td>
                 <td class="admin-action">${field('empId')}</td>
                 <td class="time-text nowrap col-time">${esc(dateStr)}</td>
-                <td class="admin-action"><button class="danger" onclick="deleteUser(${id})">刪除</button></td>
+                <td class="admin-action"><button class="danger" ${isLocked(user.category) ? 'disabled title="已產生對戰表"' : ''} onclick="deleteUser(${id})">刪除</button></td>
             </tr>`;
         };
         tbody.innerHTML = Object.keys(CATEGORIES).map(category => {
@@ -678,7 +690,8 @@
         if (field === 'category') {
             if (value === user.category) return;
             if (allUsers.some(u => u.id !== id && u.category === value && samePerson(u, user))) { alert(`這位選手已報名【${CATEGORIES[value].label}】`); restore(); return; }
-            if (isInBracket(id) && !confirm("這位選手已在賽程中。換組後不會被排進之後的輪次，已打完的成績會留在原組別。確定要換組嗎？")) { restore(); return; }
+            const lockedCat = [user.category, value].find(isLocked);
+            if (lockedCat) { alert(lockedMessage(lockedCat)); restore(); return; }
             const updates = { [`users/${id}/category`]: value };
             if (user.empId) {
                 updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
@@ -694,9 +707,9 @@
 
     function deleteUser(id) {
         if (!isAdmin) return;
-        const warning = isInBracket(id) ? "\n\n⚠️ 這位選手已在賽程中！刪除後不會再被配對，已打完的成績仍會保留。" : "";
-        if (!confirm("確定要刪除這筆報名嗎？（只刪這一組）" + warning)) return;
         const user = allUsers.find(u => u.id === id);
+        if (user && isLocked(user.category)) { alert(lockedMessage(user.category)); return; }
+        if (!confirm("確定要刪除這筆報名嗎？（只刪這一組）")) return;
         const updates = { [`users/${id}`]: null, [`userPrivate/${id}`]: null };
         if (user && user.empId) updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
         write(db.ref().update(updates));
@@ -1134,6 +1147,8 @@
         db.ref(`tournament/${category}`).on('value', snapshot => {
             bracketData[category] = snapshot.val();
             renderBracket(category);
+            renderList();
+            updateCategoryLocks();
         });
     });
 
