@@ -401,7 +401,7 @@
         const password = document.getElementById('loginPassword').value;
         auth.signInWithEmailAndPassword(email, password)
             .then(closeLogin)
-            .catch(() => alert("登入失敗，請確認 Email 和密碼"));
+            .catch(err => { console.error(err); alert("登入失敗，錯誤代碼：" + (err && err.code ? err.code : err)); });
     }
 
     function migrateEmpIds() {
@@ -898,7 +898,10 @@
     });
 
     localStorage.removeItem('goClubAdmin');
-    auth.onAuthStateChanged(user => setAdminMode(!!user && user.uid === ADMIN_UID));
+    auth.onAuthStateChanged(user => {
+        if (user && user.uid !== ADMIN_UID) alert("這個帳號不是管理員。\n目前帳號 UID：" + user.uid);
+        setAdminMode(!!user && user.uid === ADMIN_UID);
+    });
     refreshBrackets();
 
     db.ref('config/registrationOpen').on('value', snapshot => {
