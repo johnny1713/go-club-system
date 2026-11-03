@@ -57,7 +57,7 @@
         
         .player { padding: 8px 5px; display: flex; justify-content: space-between; align-items: center; cursor: default; border-radius: 3px; font-size: 1.1em; }
         .player.winner { font-weight: bold; color: green; background-color: #e8f5e9; }
-        .player.loser { color: #999; text-decoration: line-through; }
+        .player.loser { color: #777; text-decoration: line-through; }
         .player.bye-text { color: #999; font-style: italic; }
         
         .status-badge { font-size: 0.8em; padding: 2px 6px; border-radius: 4px; background: #eee; color: #666; margin-left: 5px; }
@@ -66,16 +66,16 @@
         /* Admin Interaction Styles */
         body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
         body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; }
-        body.is-admin .player.locked { cursor: not-allowed; opacity: 0.6; }
+        body.is-admin .player.locked { cursor: not-allowed; }
 
         /* Swiss Round Section */
         .swiss-round-container { margin-bottom: 30px; border: 1px solid #eee; padding: 15px; border-radius: 8px; background: #fff; }
         .swiss-round-title { font-weight: bold; font-size: 1.2em; color: var(--primary); border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-bottom: 10px; }
         
         .rr-standings th { background-color: var(--accent); }
-        .rank-1 { color: gold; font-weight: bold; text-shadow: 1px 1px 0 #999; }
-        .rank-2 { color: silver; font-weight: bold; text-shadow: 1px 1px 0 #999; }
-        .rank-3 { color: #cd7f32; font-weight: bold; text-shadow: 1px 1px 0 #999; }
+        .rank-1 { color: #b8860b; font-weight: bold; }
+        .rank-2 { color: #6c7a89; font-weight: bold; }
+        .rank-3 { color: #a0522d; font-weight: bold; }
         
         .playoff-win-text { color: #d35400; font-weight: bold; font-size: 0.9em; }
         .playoff-loss-text { color: #7f8c8d; font-size: 0.9em; }
@@ -107,8 +107,55 @@
         body.is-admin .playoff-controls { display: block; }
         .playoff-matches-container { display: flex; flex-wrap: wrap; }
 
-        .edit-input { width: 100px; padding: 2px; }
-        .admin-select { width: auto; padding: 5px; border-color: var(--accent); }
+        .edit-input { width: 110px; padding: 6px; }
+        .admin-select { width: auto; padding: 6px; border-color: var(--accent); }
+
+        /* Layout helpers */
+        .nowrap { white-space: nowrap; }
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; }
+        .table-wrap table { margin-top: 0; }
+        .notice-text { color: #c0392b; font-weight: bold; }
+        .form-narrow { max-width: 480px; }
+        .bracket-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+        .bracket-head h2 { margin: 0; flex: 1 1 280px; }
+        .format-panel { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .format-panel select { width: auto; margin: 0 8px; }
+        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .match-grid .match { margin: 0; }
+        .playoff-controls select { width: auto; max-width: 40%; margin: 0 4px; }
+        .playoff-controls label { display: inline; }
+
+        /* 名單不要被撐滿整頁 */
+        #listTable { width: auto; min-width: 480px; }
+        #listTable td, #listTable th { padding: 8px 14px; }
+        #listTable button { padding: 5px 12px; font-size: 14px; }
+        .rr-grid { min-width: 480px; }
+        .rr-grid th, .rr-grid td { padding: 10px 8px; }
+        .rr-grid th { color: #333; white-space: nowrap; }
+        #adminStatus { margin-bottom: 12px; }
+        .rr-grid td:first-child { position: sticky; left: 0; white-space: nowrap; }
+
+        @media (max-width: 640px) {
+            body { padding: 0; }
+            .container { padding: 12px; border-radius: 0; box-shadow: none; }
+            h1 { font-size: 1.4em; margin: 8px 0 12px; }
+            h2 { font-size: 1.15em; }
+            .tabs { gap: 3px; }
+            .tab { padding: 10px 4px; white-space: nowrap; flex: 1 1 auto; text-align: center; font-size: 0.88em; }
+            input, select { font-size: 16px; }
+            button { padding: 10px 14px; font-size: 15px; }
+            button.admin-btn { margin: 4px 4px 0 0; }
+            th, td { padding: 8px; font-size: 0.92em; }
+            .col-time { display: none; }
+            #listTable { width: 100%; min-width: 0; }
+            #listTable td, #listTable th { padding: 6px 4px; white-space: nowrap; }
+            #listTable .edit-input { width: 72px; padding: 5px 4px; }
+            #listTable .admin-select { padding: 5px 2px; }
+            #listTable button { padding: 6px 8px; }
+            #listTable .admin-action { width: auto; }
+            .match-grid { grid-template-columns: 1fr; }
+            .swiss-round-container { padding: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -142,7 +189,7 @@
             <button class="warning" onclick="migrateEmpIds()">搬移到管理員專區</button>
         </div>
 
-        <div id="registrationForm">
+        <div id="registrationForm" class="form-narrow">
             <div class="form-group">
                 <label>組別</label>
                 <select id="regCategory">
@@ -168,22 +215,22 @@
 
     <div id="list" class="tab-content">
         <h2>已報名名單</h2>
-        <table>
+        <div class="table-wrap"><table id="listTable">
             <thead>
                 <tr>
-                    <th style="width: 120px;">組別</th>
+                    <th class="nowrap">組別</th>
                     <th>姓名</th>
                     <th class="admin-action">工號</th>
-                    <th>報名時間</th>
+                    <th class="nowrap col-time">報名時間</th>
                     <th class="admin-action">管理操作</th>
                 </tr>
             </thead>
             <tbody id="registrantsTable"></tbody>
-        </table>
+        </table></div>
     </div>
 
     <div id="bracket-beginner" class="tab-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div class="bracket-head">
             <h2 id="beginner-title">入門組 13路 對戰表</h2>
             <div>
                 <span id="beginner-swiss-actions" style="display:none;">
@@ -197,7 +244,7 @@
             </div>
         </div>
 
-        <div id="beginner-format-panel" style="display:none; background:#f8f9fa; border:1px solid #e9ecef; padding:15px; margin:10px 0; border-radius:5px;">
+        <div id="beginner-format-panel" class="format-panel" style="display:none;">
             <strong>🔧 選擇賽制：</strong>
             <select id="beginner-format" class="admin-select">
                 <option value="swiss">瑞士制</option>
@@ -213,10 +260,10 @@
         <div id="beginner-content" style="display:none;">
             <div id="beginner-rounds"></div>
             <h3>🏆 入門組 戰績排行榜</h3>
-            <table class="rr-standings">
+            <div class="table-wrap"><table class="rr-standings">
                 <thead id="beginner-standings-head"></thead>
                 <tbody id="beginner-standings-body"></tbody>
-            </table>
+            </table></div>
             <div id="beginner-grid"></div>
             <div class="playoff-area">
                 <h3>🔥 入門組 加賽區 (同分無法分出名次時使用)</h3>
@@ -231,7 +278,7 @@
     </div>
 
     <div id="bracket-advanced" class="tab-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+        <div class="bracket-head">
             <h2 id="advanced-title">進階組 19路 對戰表</h2>
             <div>
                 <span id="advanced-swiss-actions" style="display:none;">
@@ -245,7 +292,7 @@
             </div>
         </div>
 
-        <div id="advanced-format-panel" style="display:none; background:#f8f9fa; border:1px solid #e9ecef; padding:15px; margin:10px 0; border-radius:5px;">
+        <div id="advanced-format-panel" class="format-panel" style="display:none;">
             <strong>🔧 選擇賽制：</strong>
             <select id="advanced-format" class="admin-select">
                 <option value="swiss">瑞士制</option>
@@ -261,10 +308,10 @@
         <div id="advanced-content" style="display:none;">
             <div id="advanced-rounds"></div>
             <h3>🏆 進階組 戰績排行榜</h3>
-            <table class="rr-standings">
+            <div class="table-wrap"><table class="rr-standings">
                 <thead id="advanced-standings-head"></thead>
                 <tbody id="advanced-standings-body"></tbody>
-            </table>
+            </table></div>
             <div id="advanced-grid"></div>
             <div class="playoff-area">
                 <h3>🔥 進階組 加賽區 (同分無法分出名次時使用)</h3>
@@ -483,7 +530,7 @@
                 <td>${categoryHtml}</td>
                 <td>${field('name')}</td>
                 <td class="admin-action">${field('empId')}</td>
-                <td class="time-text">${esc(dateStr)}</td>
+                <td class="time-text nowrap col-time">${esc(dateStr)}</td>
                 <td class="admin-action"><button class="danger" onclick="deleteUser(${id})">刪除</button></td>
             </tr>`;
         });
@@ -538,8 +585,9 @@
         const data = bracketData[category];
         if (!data || !data.rounds || data.rounds.length === 0) { alert("沒有可以刪除的輪次！"); return; }
         const roundNum = data.rounds.length;
-        if (!confirm(`⚠️ 危險操作：\n確定要刪除「第 ${roundNum} 輪」的對戰嗎？\n\n(這通常用於修正上一輪的成績錯誤)`)) return;
-        write(db.ref(`tournament/${category}/rounds`).set(data.rounds.slice(0, -1))
+        const playoffNote = (data.playoffs || []).length ? `\n\n已有的 ${data.playoffs.length} 場加賽也會一起刪除。` : '';
+        if (!confirm(`⚠️ 危險操作：\n確定要刪除「第 ${roundNum} 輪」的對戰嗎？\n\n(這通常用於修正上一輪的成績錯誤)${playoffNote}`)) return;
+        write(db.ref(`tournament/${category}`).update({ rounds: data.rounds.slice(0, -1), playoffs: null })
             .then(() => alert(`已刪除第 ${roundNum} 輪。`)));
     };
 
@@ -593,6 +641,12 @@
         return plan;
     }
 
+    function lateJoiners(category, rounds) {
+        if (rounds.length === 0) return [];
+        const seen = new Set(rounds.flat().flatMap(m => [m.p1.id, m.p2.id]));
+        return categoryUsers(category).filter(u => !seen.has(u.id));
+    }
+
     function generateNextSwissRound(category) {
         if (!isAdmin) return;
         const data = bracketData[category];
@@ -604,12 +658,15 @@
             const unfinished = rounds[rounds.length - 1].filter(m => !m.winner);
             if (unfinished.length > 0) {
                 alert("⚠️ 上一輪還有比賽未登錄成績！\n請點擊獲勝者的名字。\n\n未完成場次：\n" +
-                    unfinished.map(m => `- ${nameOf(m.p1)} vs ${nameOf(m.p2)}`).join('\n'));
+                    unfinished.map(m => `- ${nameOf(m.p1)} vs ${nameOf(m.p2)}`).join('\n') +
+                    "\n\n(選手已被刪除的場次，也要點另一位為勝者)");
                 return;
             }
         }
         const roundLimit = participants.length % 2 === 0 ? participants.length - 1 : participants.length;
-        const extra = rounds.length >= roundLimit ? `\n\n⚠️ 已打滿 ${roundLimit} 輪，再產生一定會重複對戰。` : '';
+        const newcomers = lateJoiners(category, rounds);
+        const extra = (rounds.length >= roundLimit ? `\n\n⚠️ 已打滿 ${roundLimit} 輪，再產生一定會重複對戰。` : '') +
+            (newcomers.length ? `\n\n⚠️ 中途加入、會以 0 勝排入：${newcomers.map(u => u.name).join('、')}\n不想讓他們參賽，請先取消，到名單刪除或換組。` : '');
         if (!confirm(`確定要產生【${CATEGORIES[category].label}】第 ${rounds.length + 1} 輪對戰嗎？${extra}`)) return;
 
         const winsOf = {};
@@ -632,6 +689,11 @@
         if (plan.bye) newRound.push({ p1: { name: plan.bye.name, id: plan.bye.id }, p2: { name: "輪空", id: "BYE" }, winner: plan.bye.id });
         plan.pairs.forEach(([p1, p2]) => newRound.push({ p1: { name: p1.name, id: p1.id }, p2: { name: p2.name, id: p2.id }, winner: null }));
 
+        if (rounds.length > 0) {
+            // 另一個分頁已先產生同一輪時，不要蓋掉
+            write(db.ref(`tournament/${category}/rounds/${rounds.length}`).transaction(current => current === null ? newRound : undefined));
+            return;
+        }
         write(db.ref(`tournament/${category}`).set({
             type: 'swiss',
             rounds: [...rounds, newRound],
@@ -671,8 +733,16 @@
             s.tiePlayoff = winsWithin(s, playoffs, groups[key(s)]);
             s.tieDirect = winsWithin(s, matches, groups[key(s)]);
         });
-        return list.sort((a, b) => b.wins - a.wins || (b.sos || 0) - (a.sos || 0) ||
+        list.sort((a, b) => b.wins - a.wins || (b.sos || 0) - (a.sos || 0) ||
             b.tiePlayoff - a.tiePlayoff || b.tieDirect - a.tieDirect);
+        // 完全分不出高下的人共用同一個名次
+        list.forEach((s, idx) => {
+            const prev = list[idx - 1];
+            const tied = prev && prev.wins === s.wins && (prev.sos || 0) === (s.sos || 0) &&
+                prev.tiePlayoff === s.tiePlayoff && prev.tieDirect === s.tieDirect;
+            s.rank = tied ? prev.rank : idx + 1;
+        });
+        return list;
     }
     function applyPlayoffStatus(stats, playoffs) {
         playoffs.forEach(m => {
@@ -682,7 +752,10 @@
             if (stats[loserId]) stats[loserId].playoffStatus = 'loss';
         });
     }
-    function rankClass(idx) { return idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : ''; }
+    function rankClass(rank) { return rank <= 3 ? 'rank-' + rank : ''; }
+    function rankLabel(s, list) {
+        return '#' + s.rank + (list.filter(o => o.rank === s.rank).length > 1 ? ' (同分)' : '');
+    }
     function noteHtml(s) {
         return s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>'
             : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
@@ -731,11 +804,16 @@
     function renderSwiss(category, data) {
         const rounds = data.rounds || [];
         const playoffs = data.playoffs || [];
+        const newcomers = lateJoiners(category, rounds);
+        if (isAdmin && newcomers.length > 0) {
+            document.getElementById(`${category}-notice`).innerHTML =
+                `<p class="notice-text">⚠️ 中途加入，下一輪會以 0 勝排入：${esc(newcomers.map(u => u.name).join('、'))}</p>`;
+        }
         document.getElementById(`${category}-rounds`).innerHTML = rounds.map((round, rIdx) => {
             const mode = rIdx === rounds.length - 1 ? 'latest' : 'history';
             const cards = round.map((m, mIdx) =>
-                `<div class="match" style="width:200px;">${createPlayerHtml(m.p1, m.p2, m.winner, category, rIdx, mIdx, mode)}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(m.p2, m.p1, m.winner, category, rIdx, mIdx, mode)}</div>`).join('');
-            return `<div class="swiss-round-container"><div class="swiss-round-title">第 ${rIdx + 1} 輪</div><div style="display:flex; flex-wrap:wrap; gap:10px;">${cards}</div></div>`;
+                `<div class="match" >${createPlayerHtml(m.p1, m.p2, m.winner, category, rIdx, mIdx, mode)}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(m.p2, m.p1, m.winner, category, rIdx, mIdx, mode)}</div>`).join('');
+            return `<div class="swiss-round-container"><div class="swiss-round-title">第 ${rIdx + 1} 輪</div><div class="match-grid">${cards}</div></div>`;
         }).join('');
 
         // 已被刪除或換組的選手，已打完的成績仍要算進去
@@ -757,8 +835,8 @@
         const standings = rankStandings(list, allMatches, playoffs);
 
         document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>主分 (勝場)</th><th>輔分 (SOS)</th><th>備註</th><th>對戰紀錄</th></tr>';
-        document.getElementById(`${category}-standings-body`).innerHTML = standings.map((s, idx) =>
-            `<tr><td class="${rankClass(idx)}">#${idx + 1}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s =>
+            `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
     }
 
     function renderRoundRobin(category, data) {
@@ -771,7 +849,7 @@
         const missing = categoryUsers(category).filter(u => !inBracket.has(u.id));
         if (isAdmin && missing.length > 0) {
             document.getElementById(`${category}-notice`).innerHTML =
-                `<p style="color:#c0392b; font-weight:bold;">⚠️ 這些人是對戰表產生後才加入的，還沒有排入賽程：${esc(missing.map(u => u.name).join('、'))}。要加入請按「重新產生」（已有成績會清除）。</p>`;
+                `<p class="notice-text">⚠️ 這些人是對戰表產生後才加入的，還沒有排入賽程：${esc(missing.map(u => u.name).join('、'))}。要加入請按「重新產生」（已有成績會清除）。</p>`;
         }
 
         const stats = {};
@@ -786,13 +864,13 @@
         const standings = rankStandings(Object.values(stats), matches, playoffs);
 
         document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>勝</th><th>敗</th><th>勝率</th><th>備註</th></tr>';
-        document.getElementById(`${category}-standings-body`).innerHTML = standings.map((s, idx) => {
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s => {
             const total = s.wins + s.losses;
             const winRate = total > 0 ? Math.round(s.wins / total * 100) + '%' : '-';
-            return `<tr><td class="${rankClass(idx)}">#${idx + 1}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s)}</td></tr>`;
+            return `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s)}</td></tr>`;
         }).join('');
 
-        let grid = '<h3>⚔️ 對戰矩陣</h3><p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。管理員可點擊格子切換：勝 -> 敗 -> 未戰)</p><div style="overflow-x:auto;"><table class="rr-grid" border="1" style="border-collapse:collapse; width:100%; min-width:600px;"><tr><th style="background:#eee;">選手</th>';
+        let grid = '<h3>⚔️ 對戰矩陣</h3><p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。管理員可點擊格子切換：勝 -> 敗 -> 未戰)</p><div class="table-wrap"><table class="rr-grid"><tr><th style="background:#eee;">選手</th>';
         participants.forEach(p => { grid += `<th style="background:#eee;">${esc(nameOf(p))}</th>`; });
         grid += '</tr>';
         participants.forEach(rowP => {
