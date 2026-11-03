@@ -207,11 +207,11 @@
             </div>
             <div class="form-group">
                 <label>姓名</label>
-                <input type="text" id="regName" placeholder="請輸入姓名">
+                <input type="text" id="regName" maxlength="30" placeholder="請輸入姓名">
             </div>
             <div class="form-group">
                 <label>工號</label>
-                <input type="text" id="regEmpId" placeholder="請輸入工號">
+                <input type="text" id="regEmpId" maxlength="50" placeholder="請輸入工號">
             </div>
             <button id="submitBtn" onclick="submitRegistration()">提交報名</button>
         </div>
@@ -588,6 +588,11 @@
             const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, { empId })));
             if (dup) { alert(`此工號已報名【${CATEGORIES[dup].label}】`); return; }
         }
+        if (name.length > 30) { alert("姓名最多 30 個字"); return; }
+        if (empId.length > 50) { alert("工號最多 50 個字"); return; }
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
         const timestamp = new Date().toISOString();
         const updates = {};
         categories.forEach(category => {
@@ -596,7 +601,12 @@
             updates[`userPrivate/${id}`] = { empId };
             updates[`empIndex/${empIndexKey(category, empId)}`] = id;
         });
-        db.ref().update(updates)
+        // 斷線時 Firebase 不會回報失敗，只會一直等，所以要自己設時限
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timeout')), 15000);
+        });
+        Promise.race([db.ref().update(updates), timeout])
             .then(() => {
                 alert("報名成功！");
                 document.getElementById('regName').value = '';
@@ -604,7 +614,13 @@
                 boxes.forEach(b => { b.checked = false; });
                 switchTab('list');
             })
-            .catch(() => alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別），或報名已截止。"));
+            .catch(err => {
+                const text = String((err && (err.code || err.message)) || err);
+                if (text.includes('timeout')) alert("連線逾時，請確認網路後到「報名名單」查看，沒有出現再重新報名。");
+                else if (/permission/i.test(text)) alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別），或報名已截止。");
+                else alert("報名失敗，請確認網路後再試一次。\n" + text);
+            })
+            .finally(() => { clearTimeout(timer); submitBtn.disabled = false; });
     }
 
     function renderList() {
@@ -707,7 +723,10 @@
         const roundNum = data.rounds.length;
         const playoffNote = (data.playoffs || []).length ? `\n\n已有的 ${data.playoffs.length} 場加賽也會一起刪除。` : '';
         if (!confirm(`⚠️ 危險操作：\n確定要刪除「第 ${roundNum} 輪」的對戰嗎？\n\n(這通常用於修正上一輪的成績錯誤)${playoffNote}`)) return;
-        write(db.ref(`tournament/${category}`).update({ rounds: data.rounds.slice(0, -1), playoffs: null })
+        // 刪到一輪都不剩就回到選賽制的畫面
+        const removal = roundNum === 1 ? db.ref(`tournament/${category}`).remove()
+            : db.ref(`tournament/${category}`).update({ rounds: data.rounds.slice(0, -1), playoffs: null });
+        write(removal
             .then(() => alert(`已刪除第 ${roundNum} 輪。`)));
     };
 
@@ -868,8 +887,8 @@
         playoffs.forEach(m => {
             if (!m.winner) return;
             const loserId = m.winner === m.p1.id ? m.p2.id : m.p1.id;
-            if (stats[m.winner]) stats[m.winner].playoffStatus = 'win';
-            if (stats[loserId]) stats[loserId].playoffStatus = 'loss';
+            if (stats[m.winner]) stats[m.winner].playoffWins = (stats[m.winner].playoffWins || 0) + 1;
+            if (stats[loserId]) stats[loserId].playoffLosses = (stats[loserId].playoffLosses || 0) + 1;
         });
     }
     function rankClass(rank) { return rank <= 3 ? 'rank-' + rank : ''; }
@@ -877,8 +896,11 @@
         return '#' + s.rank + (list.filter(o => o.rank === s.rank).length > 1 ? ' (同分)' : '');
     }
     function noteHtml(s) {
-        return s.playoffStatus === 'win' ? '<span class="playoff-win-text">🔥 加賽勝</span>'
-            : s.playoffStatus === 'loss' ? '<span class="playoff-loss-text">💀 加賽敗</span>' : '';
+        const wins = s.playoffWins || 0, losses = s.playoffLosses || 0;
+        if (wins && losses) return `<span class="playoff-win-text">加賽 ${wins} 勝 ${losses} 敗</span>`;
+        if (wins) return `<span class="playoff-win-text">🔥 加賽勝${wins > 1 ? ' ×' + wins : ''}</span>`;
+        if (losses) return `<span class="playoff-loss-text">💀 加賽敗${losses > 1 ? ' ×' + losses : ''}</span>`;
+        return '';
     }
 
     // 6. 畫面
@@ -1070,7 +1092,7 @@
         const p2Id = document.getElementById(`${category}-playoff-p2`).value;
         if (!data || !p1Id || !p2Id) return;
         if (p1Id === p2Id) { alert("不能選擇同一人對戰"); return; }
-        const toPlayer = id => ({ id, name: nameOf({ id, name: '' }) });
+        const toPlayer = id => { const known = (data.participants || []).find(p => p.id === id); return { id, name: nameOf({ id, name: known ? known.name : '' }) }; };
         write(db.ref(`tournament/${category}/playoffs`).set([...(data.playoffs || []), { p1: toPlayer(p1Id), p2: toPlayer(p2Id), winner: null }]));
     };
     window.setPlayoffWinner = function(category, matchIdx, winnerId) {
