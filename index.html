@@ -178,7 +178,7 @@
         <div class="tab" onclick="switchTab('list')">報名名單</div>
         <div class="tab" onclick="switchTab('bracket-beginner')">13路圍地</div>
         <div class="tab" onclick="switchTab('bracket-advanced')">19路圍地</div>
-        <div class="tab" onclick="switchTab('bracket-capture')">吃子</div>
+        <div class="tab" onclick="switchTab('bracket-capture')">吃子棋</div>
     </div>
 
     <div id="register" class="tab-content active">
@@ -201,7 +201,7 @@
                 <div class="cat-choices">
                     <label><input type="checkbox" name="regCategory" value="beginner"> 13路圍地</label>
                     <label><input type="checkbox" name="regCategory" value="advanced"> 19路圍地</label>
-                    <label><input type="checkbox" name="regCategory" value="capture"> 吃子 <span class="time-text">（13 路，先吃 5 子獲勝）</span></label>
+                    <label><input type="checkbox" name="regCategory" value="capture"> 吃子棋 <span class="time-text">（13 路，先吃 5 子獲勝）</span></label>
                 </div>
                 <div class="time-text" style="margin-top:6px;">已報名想加報其他組：填相同姓名和工號，只勾新的組別。要退出請找管理員。</div>
             </div>
@@ -335,7 +335,7 @@
 
     <div id="bracket-capture" class="tab-content">
         <div class="bracket-head">
-            <h2 id="capture-title">吃子 對戰表</h2>
+            <h2 id="capture-title">吃子棋 對戰表</h2>
             <div>
                 <span id="capture-swiss-actions" style="display:none;">
                     <button class="admin-btn warning" onclick="deleteLastSwissRound('capture')">🔙 刪除最後一輪</button>
@@ -348,7 +348,7 @@
             </div>
         </div>
 
-        <p class="rule-note">🎯 吃子組規則：13 路棋盤，先吃 5 子獲勝。</p>
+        <p class="rule-note">🎯 吃子棋規則：13 路棋盤，先吃 5 子獲勝。</p>
         <div id="capture-format-panel" class="format-panel" style="display:none;">
             <strong>🔧 選擇賽制：</strong>
             <select id="capture-format" class="admin-select">
@@ -364,14 +364,14 @@
 
         <div id="capture-content" style="display:none;">
             <div id="capture-rounds"></div>
-            <h3>🏆 吃子 戰績排行榜</h3>
+            <h3>🏆 吃子棋 戰績排行榜</h3>
             <div class="table-wrap"><table class="rr-standings">
                 <thead id="capture-standings-head"></thead>
                 <tbody id="capture-standings-body"></tbody>
             </table></div>
             <div id="capture-grid"></div>
             <div class="playoff-area">
-                <h3>🔥 吃子 加賽區 (同分無法分出名次時使用)</h3>
+                <h3>🔥 吃子棋 加賽區 (同分無法分出名次時使用)</h3>
                 <div class="playoff-controls">
                     <label>新增場次：</label>
                     <select id="capture-playoff-p1"></select> VS <select id="capture-playoff-p2"></select>
@@ -404,7 +404,7 @@
     const CATEGORIES = {
         beginner: { label: '13路圍地' },
         advanced: { label: '19路圍地' },
-        capture: { label: '吃子' }
+        capture: { label: '吃子棋' }
     };
     const FORMATS = { 'swiss': '瑞士制', 'round-robin': '循環賽' };
 
