@@ -752,7 +752,8 @@
             updates[`userPrivate/${newId}`] = { empId: user.empId };
             updates[`empIndex/${empIndexKey(category, user.empId)}`] = newId;
         });
-        return write(db.ref().update(updates));
+        // 失敗時要重畫，勾勾才會還原
+        return db.ref().update(updates).catch(err => { showDbError(err); renderList(); });
     }
     let addGroupTarget = null;
     function openAddGroup(id) {
