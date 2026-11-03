@@ -89,6 +89,15 @@
         .cat-choices label { display: block; font-weight: normal; padding: 8px 0; cursor: pointer; }
         .cat-choices input { width: auto; margin-right: 6px; }
         button:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+        .view-switch { display: none; margin-bottom: 12px; }
+        body.is-admin .view-switch { display: block; }
+        .view-switch button { background: #eee; color: #333; padding: 6px 12px; margin-right: 4px; }
+        .view-switch button.active { background: #2c3e50; color: white; }
+        .row-actions { white-space: nowrap; }
+        .row-actions button { margin-left: 4px; }
+        .add-group-btn { background: #2471a3; }
+        .person-check { text-align: center; }
+        .person-check input { width: 20px; height: 20px; margin: 0; }
         .rule-note { color: #2471a3; font-weight: bold; margin: 10px 0; }
         .time-text { font-size: 0.85em; color: #666; }
 
@@ -155,7 +164,11 @@
             .col-time { display: none; }
             #listTable { width: 100%; min-width: 0; }
             #listTable td, #listTable th { padding: 6px 4px; white-space: nowrap; }
-            #listTable .edit-input { width: 72px; padding: 5px 4px; }
+            #listTable .edit-input { width: 64px; padding: 5px 3px; }
+            #listTable .admin-select { max-width: 76px; }
+            #listTable button { font-size: 13px; }
+            #listTable .row-actions button { margin-left: 2px; }
+            .add-group-btn { padding: 6px 4px !important; }
             #listTable .admin-select { padding: 5px 2px; }
             #listTable button { padding: 6px 8px; }
             #listTable .admin-action { width: auto; }
@@ -224,16 +237,13 @@
 
     <div id="list" class="tab-content">
         <h2>已報名名單</h2>
+        <div class="view-switch admin-action-block">
+            檢視：
+            <button id="viewGroupBtn" onclick="setListView('group')">依組別分區</button>
+            <button id="viewPersonBtn" onclick="setListView('person')">每人一列</button>
+        </div>
         <div class="table-wrap"><table id="listTable">
-            <thead>
-                <tr>
-                    <th class="nowrap">組別</th>
-                    <th>姓名</th>
-                    <th class="admin-action">工號</th>
-                    <th class="nowrap col-time">報名時間</th>
-                    <th class="admin-action">管理操作</th>
-                </tr>
-            </thead>
+            <thead id="listHead"></thead>
             <tbody id="registrantsTable"></tbody>
         </table></div>
     </div>
@@ -381,6 +391,15 @@
                 <div id="capture-playoff-matches" class="playoff-matches-container"></div>
             </div>
         </div>
+    </div>
+</div>
+
+<div id="addGroupModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
+    <div style="background:white; padding:20px; border-radius:8px; width:300px; max-width:90%;">
+        <h3 id="addGroupTitle" style="margin-top:0;"></h3>
+        <div id="addGroupChoices" class="cat-choices"></div>
+        <button id="addGroupSubmit" onclick="submitAddGroup()">確定</button>
+        <button type="button" class="logout-btn" onclick="closeAddGroup()">取消</button>
     </div>
 </div>
 
@@ -655,14 +674,113 @@
                 <td>${field('name')}</td>
                 <td class="admin-action">${field('empId')}</td>
                 <td class="time-text nowrap col-time">${esc(dateStr)}</td>
-                <td class="admin-action"><button class="danger" ${isLocked(user.category) ? 'disabled title="已產生對戰表"' : ''} onclick="deleteUser(${id})">刪除</button></td>
+                <td class="admin-action row-actions"><button class="add-group-btn" onclick="openAddGroup(${id})">＋加組</button><button class="danger" ${isLocked(user.category) ? 'disabled title="已產生對戰表"' : ''} onclick="deleteUser(${id})">刪除</button></td>
             </tr>`;
         };
+        const personView = isAdmin && listView === 'person';
+        document.getElementById('viewGroupBtn').classList.toggle('active', !personView);
+        document.getElementById('viewPersonBtn').classList.toggle('active', personView);
+        if (personView) { renderPersonList(tbody); return; }
+        document.getElementById('listHead').innerHTML = `<tr>
+            <th class="nowrap">組別</th><th>姓名</th><th class="admin-action">工號</th>
+            <th class="nowrap col-time">報名時間</th><th class="admin-action">管理操作</th></tr>`;
         tbody.innerHTML = Object.keys(CATEGORIES).map(category => {
             const members = categoryUsers(category).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             if (!members.length) return '';
             return `<tr class="group-row"><td colspan="5">${esc(CATEGORIES[category].label)}（${members.length} 人）</td></tr>` + members.map(rowHtml).join('');
         }).join('');
+    }
+
+    // 每人一列（只有管理員看得到工號，才能認出同一人）
+    let listView = localStorage.getItem('goClubListView') === 'person' ? 'person' : 'group';
+    function setListView(view) {
+        listView = view;
+        localStorage.setItem('goClubListView', view);
+        renderList();
+    }
+    function personGroups() {
+        const people = new Map();
+        allUsers.forEach(u => {
+            const key = u.empId ? 'e:' + empKey(u.empId) : 'i:' + u.id;
+            if (!people.has(key)) people.set(key, []);
+            people.get(key).push(u);
+        });
+        return [...people.values()].sort((a, b) => a[0].name.localeCompare(b[0].name, 'zh-TW'));
+    }
+    function renderPersonList(tbody) {
+        const cats = Object.keys(CATEGORIES);
+        document.getElementById('listHead').innerHTML =
+            `<tr><th>姓名</th><th>工號</th>${cats.map(c => `<th class="nowrap">${esc(CATEGORIES[c].label)}</th>`).join('')}</tr>`;
+        tbody.innerHTML = personGroups().map(rows => {
+            const first = rows[0];
+            const id = jsArg(first.id);
+            const cells = cats.map(c => {
+                const row = rows.find(r => r.category === c);
+                const disabled = isLocked(c) ? 'disabled title="已產生對戰表"' : '';
+                const action = row ? `togglePersonGroup(${jsArg(row.id)}, null, this)` : `togglePersonGroup(${id}, '${c}', this)`;
+                return `<td class="person-check"><input type="checkbox" ${row ? 'checked' : ''} ${disabled} onchange="${action}"></td>`;
+            }).join('');
+            return `<tr>
+                <td><input class="edit-input" value="${esc(first.name)}" onchange="updateUser(${id}, 'name', this.value, this)"></td>
+                <td><input class="edit-input" value="${esc(first.empId)}" onchange="updateUser(${id}, 'empId', this.value, this)"></td>
+                ${cells}</tr>`;
+        }).join('');
+    }
+    // category 有值是加入；null 是退出 id 這一筆
+    function togglePersonGroup(id, category, box) {
+        if (!isAdmin) return;
+        if (category) { addGroups(id, [category]); return; }
+        deleteUser(id);
+        renderList(); // 取消刪除時把勾勾還原
+    }
+
+    // 加報：沿用這個人的姓名和工號
+    function addGroups(id, categories) {
+        const user = allUsers.find(u => u.id === id);
+        if (!isAdmin || !user || !categories.length) return Promise.resolve();
+        const failed = message => { alert(message); renderList(); return Promise.resolve(); };
+        if (!user.empId) return failed("這筆報名沒有工號，請先補上工號再加組。");
+        const lockedCat = categories.find(isLocked);
+        if (lockedCat) return failed(lockedMessage(lockedCat));
+        const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, user)));
+        if (dup) return failed(`這位選手已報名【${CATEGORIES[dup].label}】`);
+        const timestamp = new Date().toISOString();
+        const updates = {};
+        categories.forEach(category => {
+            const newId = db.ref('users').push().key;
+            updates[`users/${newId}`] = { name: user.name, category, timestamp };
+            updates[`userPrivate/${newId}`] = { empId: user.empId };
+            updates[`empIndex/${empIndexKey(category, user.empId)}`] = newId;
+        });
+        return write(db.ref().update(updates));
+    }
+    let addGroupTarget = null;
+    function openAddGroup(id) {
+        const user = allUsers.find(u => u.id === id);
+        if (!isAdmin || !user) return;
+        addGroupTarget = id;
+        document.getElementById('addGroupTitle').textContent = `${user.name} 加報哪些組？`;
+        let selectable = 0;
+        document.getElementById('addGroupChoices').innerHTML = Object.keys(CATEGORIES).map(c => {
+            const joined = allUsers.some(u => u.category === c && (u.id === id || samePerson(u, user)));
+            const locked = isLocked(c);
+            if (!joined && !locked) selectable++;
+            const note = joined ? '（已報名）' : locked ? '（已開賽）' : '';
+            return `<label><input type="checkbox" value="${c}" ${joined ? 'checked' : ''} ${joined || locked ? 'disabled' : ''}> ${esc(CATEGORIES[c].label)} <span class="time-text">${note}</span></label>`;
+        }).join('');
+        document.getElementById('addGroupSubmit').disabled = selectable === 0;
+        document.getElementById('addGroupModal').style.display = 'flex';
+    }
+    function closeAddGroup() {
+        addGroupTarget = null;
+        document.getElementById('addGroupModal').style.display = 'none';
+    }
+    function submitAddGroup() {
+        const boxes = [...document.querySelectorAll('#addGroupChoices input:checked:not(:disabled)')];
+        if (!boxes.length) { alert("請至少勾選一個組別"); return; }
+        const id = addGroupTarget;
+        closeAddGroup();
+        addGroups(id, boxes.map(b => b.value));
     }
 
     function updateUser(id, field, rawValue, inputEl) {
