@@ -1245,9 +1245,15 @@
         const updates = {};
         if (isWithdrawn(category, playerId)) {
             const undo = slots.filter(({ m }) => m.forfeit === playerId);
-            if (!confirm(`確定要取消【${nameText}】的棄權嗎？\n${undo.length ? `因棄權判給對手的 ${undo.length} 場會變回未完成。` : ''}${swiss ? '\n下一輪起會重新配對。' : ''}`)) return;
+            if (!confirm(`確定要取消【${nameText}】的棄權嗎？\n${undo.length ? `因棄權判給對手的 ${undo.length} 場會變回未完成（對手也棄權的場次則改判給【${nameText}】）。` : ''}${swiss ? '\n下一輪起會重新配對。' : ''}`)) return;
             updates[`withdrawn/${playerId}`] = null;
-            undo.forEach(({ path }) => { updates[`${path}/winner`] = null; updates[`${path}/forfeit`] = null; });
+            undo.forEach(({ m, path }) => {
+                // 對手仍在棄權中就直接判給取消棄權的人，否則這場沒人能打
+                const opponentId = m.p1.id === playerId ? m.p2.id : m.p1.id;
+                const opponentOut = isWithdrawn(category, opponentId);
+                updates[`${path}/winner`] = opponentOut ? playerId : null;
+                updates[`${path}/forfeit`] = opponentOut ? opponentId : null;
+            });
         } else {
             const open = slots.filter(({ m }) => !m.winner && (m.p1.id === playerId || m.p2.id === playerId));
             if (!confirm(`確定要讓【${nameText}】棄權嗎？\n${open.length ? `還沒打的 ${open.length} 場會判給對手。` : ''}${swiss ? '\n之後不再配對，已打完的成績保留。' : '\n已打完的成績保留。'}`)) return;
