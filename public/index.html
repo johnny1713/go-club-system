@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圍棋社交流賽</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #d35400;
+            --bg: #fdfbf7;
+            --board-color: #e6b35c;
+        }
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
+        
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        
+        h1 { text-align: center; color: var(--primary); cursor: pointer; user-select: none; }
+        h2 { border-bottom: 2px solid var(--board-color); padding-bottom: 10px; margin-top: 30px;}
+
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #eee; border-radius: 5px 5px 0 0; }
+        .tab.active { background: var(--primary); color: white; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: #c0392b; }
+        button.success { background: #27ae60; }
+        button.warning { background: #f39c12; }
+        button.admin-btn { background: var(--accent); display: none; margin-left: 10px; }
+        button.logout-btn { background: #7f8c8d; font-size: 0.8em; padding: 5px 10px; margin-top: 5px; }
+
+        /* Admin Controls */
+        .admin-controls-panel { display: none; background-color: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        .registration-closed-msg { display: none; color: #c0392b; font-weight: bold; text-align: center; padding: 10px; border: 1px dashed #c0392b; background: #fdedec; margin-top: 10px; }
+
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: var(--primary); color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+
+        /* Match Styles */
+        .match { background: #fff; border: 1px solid #ccc; margin: 10px 0; padding: 10px; border-radius: 4px; position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .match:hover { border-color: var(--accent); }
+        
+        .player { padding: 8px 5px; display: flex; justify-content: space-between; align-items: center; cursor: default; border-radius: 3px; font-size: 1.1em; }
+        .player.winner { font-weight: bold; color: green; background-color: #e8f5e9; }
+        .player.loser { color: #777; text-decoration: line-through; }
+        .player.bye-text { color: #999; font-style: italic; }
+        
+        .status-badge { font-size: 0.8em; padding: 2px 6px; border-radius: 4px; background: #eee; color: #666; margin-left: 5px; }
+        .status-win { background: #27ae60; color: white; }
+        
+        /* Admin Interaction Styles */
+        body.is-admin .player.clickable:hover { background-color: #ffeaa7; cursor: pointer; outline: 1px solid orange; }
+        body.is-admin .player.undoable:hover { background-color: #ffcccc; cursor: pointer; outline: 1px solid red; }
+        body.is-admin .player.locked { cursor: not-allowed; }
+
+        /* Swiss Round Section */
+        .swiss-round-container { margin-bottom: 30px; border: 1px solid #eee; padding: 15px; border-radius: 8px; background: #fff; }
+        .swiss-round-title { font-weight: bold; font-size: 1.2em; color: var(--primary); border-bottom: 2px solid var(--accent); padding-bottom: 5px; margin-bottom: 10px; }
+        
+        .rr-standings th { background-color: var(--accent); }
+        .rank-1 { color: #b8860b; font-weight: bold; }
+        .rank-2 { color: #6c7a89; font-weight: bold; }
+        .rank-3 { color: #a0522d; font-weight: bold; }
+        
+        .playoff-win-text { color: #d35400; font-weight: bold; font-size: 0.9em; }
+        .playoff-loss-text { color: #7f8c8d; font-size: 0.9em; }
+
+        /* Tag Styles */
+        .tag { padding: 4px 8px; border-radius: 4px; color: white; font-size: 0.9em; display: inline-block; font-weight: bold; text-align: center; min-width: 60px;}
+        .tag-beginner { background-color: #27ae60; }
+        .tag-advanced { background-color: #c0392b; }
+        .tag-capture { background-color: #2471a3; }
+        .group-row td { background: #e8edf2; font-weight: bold; color: #2c3e50; }
+        .cat-choices label { display: block; font-weight: normal; padding: 8px 0; cursor: pointer; }
+        .cat-choices input { width: auto; margin-right: 6px; }
+        button:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+        .view-switch { display: none; margin-bottom: 12px; }
+        body.is-admin .view-switch { display: block; }
+        .view-switch button { background: #eee; color: #333; padding: 6px 12px; margin-right: 4px; }
+        .view-switch button.active { background: #2c3e50; color: white; }
+        .row-actions { white-space: nowrap; }
+        .row-actions button { margin-left: 4px; }
+        .add-group-btn { background: #2471a3; }
+        .person-check { text-align: center; }
+        .person-check input { width: 20px; height: 20px; margin: 0; }
+        .withdraw-btn { background: #7f8c8d; padding: 3px 8px; font-size: 0.85em; }
+        .rule-note { color: #2471a3; font-weight: bold; margin: 10px 0; }
+        .time-text { font-size: 0.85em; color: #666; }
+
+        /* Admin Mode */
+        body.is-admin .admin-btn { display: inline-block; }
+        body.is-admin .admin-action { display: table-cell; }
+        body.is-admin .admin-controls-panel { display: block; }
+        .admin-action { display: none; width: 80px; text-align: center; }
+        
+        /* RR Grid Styles */
+        .rr-grid th, .rr-grid td { text-align: center; vertical-align: middle; padding: 15px; border: 1px solid #ccc; font-size: 1.1em; }
+        .rr-cell-self { background-color: #eee; }
+        .rr-cell-win { background-color: #d4edda; color: #155724; font-weight: bold; }
+        .rr-cell-loss { background-color: #f8d7da; color: #721c24; }
+        .rr-cell-play { background-color: #fff; color: #aaa; } 
+        body.is-admin .rr-cell-clickable { cursor: pointer !important; position: relative; }
+        body.is-admin .rr-cell-clickable:hover { background-color: #ffeaa7 !important; outline: 2px solid var(--accent); z-index: 10; }
+
+        /* Playoff Section */
+        .playoff-area { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; }
+        .playoff-controls { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; display: none; }
+        body.is-admin .playoff-controls { display: block; }
+        .playoff-matches-container { display: flex; flex-wrap: wrap; }
+
+        .edit-input { width: 110px; padding: 6px; }
+        .admin-select { width: auto; padding: 6px; border-color: var(--accent); }
+
+        /* Layout helpers */
+        .nowrap { white-space: nowrap; }
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; }
+        .table-wrap table { margin-top: 0; }
+        .notice-text { color: #c0392b; font-weight: bold; }
+        .form-narrow { max-width: 480px; }
+        .bracket-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+        .bracket-head h2 { margin: 0; flex: 1 1 280px; }
+        .format-panel { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .format-panel select { width: auto; margin: 0 8px; }
+        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .match-grid .match { margin: 0; }
+        .playoff-controls select { width: auto; max-width: 40%; margin: 0 4px; }
+        .playoff-controls label { display: inline; }
+
+        /* 名單不要被撐滿整頁 */
+        #listTable { width: auto; min-width: 480px; }
+        #listTable td, #listTable th { padding: 8px 14px; }
+        #listTable button { padding: 5px 12px; font-size: 14px; }
+        .rr-grid { min-width: 480px; }
+        .rr-grid th, .rr-grid td { padding: 10px 8px; }
+        .rr-grid th { color: #333; white-space: nowrap; }
+        #adminStatus { margin-bottom: 12px; }
+        .rr-grid td:first-child { position: sticky; left: 0; white-space: nowrap; }
+
+        @media (max-width: 640px) {
+            body { padding: 0; }
+            .container { padding: 12px; border-radius: 0; box-shadow: none; }
+            h1 { font-size: 1.4em; margin: 8px 0 12px; }
+            h2 { font-size: 1.15em; }
+            .tabs { gap: 3px; flex-wrap: wrap; }
+            .tab { padding: 10px 4px; white-space: nowrap; flex: 1 1 30%; margin-right: 0; text-align: center; font-size: 0.88em; }
+            input, select { font-size: 16px; }
+            button { padding: 10px 14px; font-size: 15px; }
+            button.admin-btn { margin: 4px 4px 0 0; }
+            th, td { padding: 8px; font-size: 0.92em; }
+            .col-time { display: none; }
+            #listTable { width: 100%; min-width: 0; }
+            #listTable td, #listTable th { padding: 6px 4px; white-space: nowrap; }
+            #listTable .edit-input { width: 64px; padding: 5px 3px; }
+            #listTable .admin-select { max-width: 76px; }
+            #listTable button { font-size: 13px; }
+            #listTable .row-actions button { margin-left: 2px; }
+            .add-group-btn { padding: 6px 4px !important; }
+            #listTable .admin-select { padding: 5px 2px; }
+            #listTable button { padding: 6px 8px; }
+            #listTable .admin-action { width: auto; }
+            .match-grid { grid-template-columns: 1fr; }
+            .swiss-round-container { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 id="appTitle" title="圍棋社交流賽">圍棋社交流賽</h1>
+    <div id="adminStatus" style="text-align:center; color: red; display:none;">
+        (管理員模式已啟用)<br>
+        <span style="font-size:0.8em; color:#666;">💡 提示：點擊「格子」或「名字」切換勝負</span><br>
+        <button class="logout-btn" onclick="logout()">登出管理員</button>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('register')">報名頁面</div>
+        <div class="tab" onclick="switchTab('list')">報名名單</div>
+        <div class="tab" onclick="switchTab('bracket-beginner')">13路圍地</div>
+        <div class="tab" onclick="switchTab('bracket-advanced')">19路圍地</div>
+        <div class="tab" onclick="switchTab('bracket-capture')">吃子棋</div>
+    </div>
+
+    <div id="register" class="tab-content active">
+        <h2>選手報名</h2>
+        <div class="admin-controls-panel">
+            <strong>🔧 管理員控制：</strong>
+            <button class="success" onclick="toggleRegistration(true)">🟢 開啟報名</button>
+            <button class="danger" onclick="toggleRegistration(false)">🔴 截止報名</button>
+            <span id="adminRegStatus" style="margin-left:10px; font-weight:bold;"></span>
+        </div>
+
+        <div id="migratePanel" class="admin-controls-panel" style="display:none;">
+            <strong>⚠️ 有工號還存在公開資料裡：</strong>
+            <button class="warning" onclick="migrateEmpIds()">搬移到管理員專區</button>
+        </div>
+
+        <div id="registrationForm" class="form-narrow">
+            <div class="form-group">
+                <label>組別（可複選）</label>
+                <div class="cat-choices">
+                    <label><input type="checkbox" name="regCategory" value="beginner"> 13路圍地</label>
+                    <label><input type="checkbox" name="regCategory" value="advanced"> 19路圍地</label>
+                    <label><input type="checkbox" name="regCategory" value="capture"> 吃子棋 <span class="time-text">（13 路，先吃 5 子獲勝）</span></label>
+                </div>
+                <div class="time-text" style="margin-top:6px;">已報名想加報其他組：填相同姓名和工號，只勾新的組別。要退出請找管理員。</div>
+            </div>
+            <div class="form-group">
+                <label>姓名</label>
+                <input type="text" id="regName" maxlength="30" placeholder="請輸入姓名">
+            </div>
+            <div class="form-group">
+                <label>工號</label>
+                <input type="text" id="regEmpId" maxlength="50" placeholder="請輸入工號">
+            </div>
+            <button id="submitBtn" onclick="submitRegistration()">提交報名</button>
+        </div>
+
+        <div id="regClosedMsg" class="registration-closed-msg">
+            ⚠️ 目前報名已截止，請聯繫管理員。
+        </div>
+    </div>
+
+    <div id="list" class="tab-content">
+        <h2>已報名名單</h2>
+        <div class="view-switch admin-action-block">
+            檢視：
+            <button id="viewGroupBtn" onclick="setListView('group')">依組別分區</button>
+            <button id="viewPersonBtn" onclick="setListView('person')">每人一列</button>
+        </div>
+        <div class="table-wrap"><table id="listTable">
+            <thead id="listHead"></thead>
+            <tbody id="registrantsTable"></tbody>
+        </table></div>
+    </div>
+
+    <div id="bracket-beginner" class="tab-content">
+        <div class="bracket-head">
+            <h2 id="beginner-title">13路圍地 對戰表</h2>
+            <div>
+                <span id="beginner-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('beginner')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('beginner')">➕ 產生下一輪</button>
+                </span>
+                <span id="beginner-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('beginner')">重新產生</button>
+                </span>
+                <button class="admin-btn danger" onclick="clearBracket('beginner')">🗑️ 清空賽程</button>
+            </div>
+        </div>
+
+        <div id="beginner-format-panel" class="format-panel" style="display:none;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="beginner-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('beginner')">產生對戰表</button>
+        </div>
+        <p id="beginner-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="beginner-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="beginner-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="beginner-notice"></div>
+
+        <div id="beginner-content" style="display:none;">
+            <div id="beginner-rounds"></div>
+            <h3>🏆 13路圍地 戰績排行榜</h3>
+            <div class="table-wrap"><table class="rr-standings">
+                <thead id="beginner-standings-head"></thead>
+                <tbody id="beginner-standings-body"></tbody>
+            </table></div>
+            <div id="beginner-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 13路圍地 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="beginner-playoff-p1"></select> VS <select id="beginner-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('beginner')">新增</button>
+                </div>
+                <div id="beginner-playoff-matches" class="playoff-matches-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="bracket-advanced" class="tab-content">
+        <div class="bracket-head">
+            <h2 id="advanced-title">19路圍地 對戰表</h2>
+            <div>
+                <span id="advanced-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('advanced')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('advanced')">➕ 產生下一輪</button>
+                </span>
+                <span id="advanced-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('advanced')">重新產生</button>
+                </span>
+                <button class="admin-btn danger" onclick="clearBracket('advanced')">🗑️ 清空賽程</button>
+            </div>
+        </div>
+
+        <div id="advanced-format-panel" class="format-panel" style="display:none;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="advanced-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('advanced')">產生對戰表</button>
+        </div>
+        <p id="advanced-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="advanced-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="advanced-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="advanced-notice"></div>
+
+        <div id="advanced-content" style="display:none;">
+            <div id="advanced-rounds"></div>
+            <h3>🏆 19路圍地 戰績排行榜</h3>
+            <div class="table-wrap"><table class="rr-standings">
+                <thead id="advanced-standings-head"></thead>
+                <tbody id="advanced-standings-body"></tbody>
+            </table></div>
+            <div id="advanced-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 19路圍地 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="advanced-playoff-p1"></select> VS <select id="advanced-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('advanced')">新增</button>
+                </div>
+                <div id="advanced-playoff-matches" class="playoff-matches-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="bracket-capture" class="tab-content">
+        <div class="bracket-head">
+            <h2 id="capture-title">吃子棋 對戰表</h2>
+            <div>
+                <span id="capture-swiss-actions" style="display:none;">
+                    <button class="admin-btn warning" onclick="deleteLastSwissRound('capture')">🔙 刪除最後一輪</button>
+                    <button class="admin-btn success" onclick="generateNextSwissRound('capture')">➕ 產生下一輪</button>
+                </span>
+                <span id="capture-rr-actions" style="display:none;">
+                    <button class="admin-btn" onclick="generateRoundRobinBracket('capture')">重新產生</button>
+                </span>
+                <button class="admin-btn danger" onclick="clearBracket('capture')">🗑️ 清空賽程</button>
+            </div>
+        </div>
+
+        <p class="rule-note">🎯 吃子棋規則：13 路棋盤，先吃 5 子獲勝。</p>
+        <div id="capture-format-panel" class="format-panel" style="display:none;">
+            <strong>🔧 選擇賽制：</strong>
+            <select id="capture-format" class="admin-select">
+                <option value="swiss">瑞士制</option>
+                <option value="round-robin">循環賽</option>
+            </select>
+            <button class="success" onclick="generateBracket('capture')">產生對戰表</button>
+        </div>
+        <p id="capture-empty" style="padding:20px; color:#666;">尚未產生對戰表</p>
+        <p id="capture-swiss-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 瑞士制規則：不用淘汰，系統自動配對。若需修改歷史成績，請先「刪除最後一輪」。</p>
+        <p id="capture-rr-hint" style="display:none; color:#666; font-size:0.9em; margin:10px 0;">💡 循環賽規則：每位選手都會互相對戰一次。</p>
+        <div id="capture-notice"></div>
+
+        <div id="capture-content" style="display:none;">
+            <div id="capture-rounds"></div>
+            <h3>🏆 吃子棋 戰績排行榜</h3>
+            <div class="table-wrap"><table class="rr-standings">
+                <thead id="capture-standings-head"></thead>
+                <tbody id="capture-standings-body"></tbody>
+            </table></div>
+            <div id="capture-grid"></div>
+            <div class="playoff-area">
+                <h3>🔥 吃子棋 加賽區 (同分無法分出名次時使用)</h3>
+                <div class="playoff-controls">
+                    <label>新增場次：</label>
+                    <select id="capture-playoff-p1"></select> VS <select id="capture-playoff-p2"></select>
+                    <button onclick="addPlayoffMatch('capture')">新增</button>
+                </div>
+                <div id="capture-playoff-matches" class="playoff-matches-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="addGroupModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
+    <div style="background:white; padding:20px; border-radius:8px; width:300px; max-width:90%;">
+        <h3 id="addGroupTitle" style="margin-top:0;"></h3>
+        <div id="addGroupChoices" class="cat-choices"></div>
+        <button id="addGroupSubmit" onclick="submitAddGroup()">確定</button>
+        <button type="button" class="logout-btn" onclick="closeAddGroup()">取消</button>
+    </div>
+</div>
+
+<div id="loginModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
+    <form onsubmit="submitLogin(event)" style="background:white; padding:20px; border-radius:8px; width:300px; max-width:90%;">
+        <h3 style="margin-top:0;">管理員登入</h3>
+        <div class="form-group"><label>Email</label><input type="email" id="loginEmail" autocomplete="username" required></div>
+        <div class="form-group"><label>密碼</label><input type="password" id="loginPassword" autocomplete="current-password" required></div>
+        <button type="submit">登入</button>
+        <button type="button" class="logout-btn" onclick="closeLogin()">取消</button>
+    </form>
+</div>
+
+<script>
+    // 1. 全域變數
+    let clickCount = 0;
+    let isAdmin = false;
+    let isRegistrationOpen = true;
+    let allUsers = [];
+    let bracketData = { beginner: null, advanced: null, capture: null };
+
+    const CATEGORIES = {
+        beginner: { label: '13路圍地' },
+        advanced: { label: '19路圍地' },
+        capture: { label: '吃子棋' }
+    };
+    const FORMATS = { 'swiss': '瑞士制', 'round-robin': '循環賽' };
+
+    const ADMIN_UID = "oweTRJacR0XO4tbKjvRZqhaoHbr1";
+    let publicUsers = null;
+    let privateUsers = {};
+    let privateLoaded = false;
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDNmDH2jTCu9miZtzTM73H1gLYJ3EOazsQ",
+        authDomain: "go-club-818e2.firebaseapp.com",
+        databaseURL: "https://go-club-818e2-default-rtdb.firebaseio.com",
+        projectId: "go-club-818e2",
+        storageBucket: "go-club-818e2.firebasestorage.app",
+        messagingSenderId: "818869551072",
+        appId: "1:818869551072:web:8408991a2dedd1f9e1b585",
+        measurementId: "G-3S2G8R5QJD"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const auth = firebase.auth();
+
+    // 2. 工具函式
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    // 放進 onclick="..." 的字串參數
+    function jsArg(value) { return esc(JSON.stringify(String(value))); }
+    function showDbError(err) { alert("寫入失敗，請確認網路或權限：\n" + (err && err.message ? err.message : err)); }
+    function write(promise) { return promise.catch(showDbError); }
+    // 改名後，舊賽程也要顯示最新名字
+    function nameOf(player) {
+        const user = allUsers.find(u => u.id === player.id);
+        return user ? user.name : player.name;
+    }
+    function isSamePair(m, idA, idB) {
+        return (m.p1.id === idA && m.p2.id === idB) || (m.p1.id === idB && m.p2.id === idA);
+    }
+    function categoryUsers(category) { return allUsers.filter(u => u.category === category); }
+    // 產生對戰表後該組就鎖定，不能再加入或退出；要改名單得先清空賽程
+    function isLocked(category) { return !!bracketData[category]; }
+    function lockedMessage(category) { return `【${CATEGORIES[category].label}】已產生對戰表，不能加入或退出。\n如需更動，請先清空該組賽程（成績會一併清除）。`; }
+    function isWithdrawn(category, id) {
+        const data = bracketData[category];
+        return !!(data && data.withdrawn && data.withdrawn[id]);
+    }
+    function updateCategoryLocks() {
+        document.querySelectorAll('input[name="regCategory"]').forEach(box => {
+            const locked = isLocked(box.value);
+            box.disabled = locked;
+            if (locked) box.checked = false;
+            let note = box.parentElement.querySelector('.lock-note');
+            if (locked && !note) {
+                note = document.createElement('span');
+                note.className = 'lock-note time-text';
+                note.textContent = ' （已開賽，不再受理）';
+                box.parentElement.appendChild(note);
+            } else if (!locked && note) note.remove();
+        });
+    }
+
+    // 3. 管理員 / 報名
+    function setAdminMode(enabled) {
+        isAdmin = enabled;
+        document.body.classList.toggle('is-admin', enabled);
+        document.getElementById('adminStatus').style.display = enabled ? 'block' : 'none';
+        const privateRef = db.ref('userPrivate');
+        privateRef.off();
+        if (enabled) {
+            privateRef.on('value', snapshot => {
+                privateUsers = snapshot.val() || {};
+                privateLoaded = true;
+                rebuildUsers();
+            }, showDbError);
+        } else {
+            privateUsers = {};
+            privateLoaded = false;
+            empIndexSynced = false;
+        }
+        updateRegistrationUI();
+        rebuildUsers();
+    }
+
+    function rebuildUsers() {
+        const data = publicUsers || {};
+        allUsers = Object.keys(data).map(key => ({
+            ...data[key],
+            id: key,
+            legacyEmpId: data[key].empId,
+            empId: (privateUsers[key] && privateUsers[key].empId) || data[key].empId || ''
+        }));
+        const panel = document.getElementById('migratePanel');
+        if (panel) panel.style.display = (isAdmin && allUsers.some(u => u.legacyEmpId)) ? 'block' : 'none';
+        renderList();
+        refreshBrackets();
+        syncEmpIndex();
+    }
+
+    function empKey(empId) {
+        return encodeURIComponent(String(empId).trim().toUpperCase()).replace(/\./g, '%2E');
+    }
+
+    function empIndexKey(category, empId) { return `${category}_${empKey(empId)}`; }
+    function samePerson(a, b) { return !!a.empId && !!b.empId && empKey(a.empId) === empKey(b.empId); }
+
+    // 舊版索引一個工號只有一筆；管理員登入時補成「每組一筆」，才能擋同組重複報名
+    let empIndexSynced = false;
+    function syncEmpIndex() {
+        if (empIndexSynced || !isAdmin || !privateLoaded || publicUsers === null) return;
+        empIndexSynced = true;
+        db.ref('empIndex').once('value').then(snapshot => {
+            const current = snapshot.val() || {};
+            const updates = {};
+            allUsers.filter(u => u.empId).forEach(u => {
+                const key = empIndexKey(u.category, u.empId);
+                if (!current[key]) updates[`empIndex/${key}`] = u.id;
+            });
+            const prefixes = Object.keys(CATEGORIES).map(c => c + '_');
+            Object.keys(current).forEach(key => {
+                if (!prefixes.some(p => key.startsWith(p))) updates[`empIndex/${key}`] = null;
+            });
+            if (Object.keys(updates).length) return db.ref().update(updates);
+        }).catch(showDbError);
+    }
+
+    function logout() { auth.signOut().catch(showDbError); }
+
+    function openLogin() {
+        document.getElementById('loginModal').style.display = 'flex';
+        document.getElementById('loginEmail').focus();
+    }
+    function closeLogin() {
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginModal').style.display = 'none';
+    }
+    function submitLogin(event) {
+        event.preventDefault();
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        auth.signInWithEmailAndPassword(email, password)
+            .then(closeLogin)
+            .catch(err => { console.error(err); alert("登入失敗，錯誤代碼：" + (err && err.code ? err.code : err)); });
+    }
+
+    function migrateEmpIds() {
+        if (!isAdmin) return;
+        const targets = allUsers.filter(u => u.legacyEmpId);
+        if (!confirm(`確定要把 ${targets.length} 筆工號搬移到管理員專區嗎？`)) return;
+        const updates = {};
+        targets.forEach(u => {
+            updates[`userPrivate/${u.id}/empId`] = u.legacyEmpId;
+            updates[`empIndex/${empIndexKey(u.category, u.legacyEmpId)}`] = u.id;
+            updates[`users/${u.id}/empId`] = null;
+        });
+        write(db.ref().update(updates).then(() => alert("搬移完成")));
+    }
+
+    function toggleRegistration(status) {
+        if (!isAdmin) return;
+        write(db.ref('config/registrationOpen').set(status).then(() => alert(status ? "報名已開啟" : "報名已截止")));
+    }
+
+    function updateRegistrationUI() {
+        const formDiv = document.getElementById('registrationForm');
+        const closedMsg = document.getElementById('regClosedMsg');
+        const adminStatusLabel = document.getElementById('adminRegStatus');
+        if (adminStatusLabel) {
+            adminStatusLabel.textContent = isRegistrationOpen ? "(目前狀態：開啟)" : "(目前狀態：截止)";
+            adminStatusLabel.style.color = isRegistrationOpen ? "green" : "red";
+        }
+        const showForm = isAdmin || isRegistrationOpen;
+        if (formDiv) formDiv.style.display = showForm ? 'block' : 'none';
+        if (closedMsg) closedMsg.style.display = showForm ? 'none' : 'block';
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const tabs = ['register', 'list', 'bracket-beginner', 'bracket-advanced', 'bracket-capture'];
+        document.querySelectorAll('.tab')[tabs.indexOf(tabId)].classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    function submitRegistration() {
+        if (!isRegistrationOpen && !isAdmin) { alert("抱歉，報名已截止。"); return; }
+        const name = document.getElementById('regName').value.trim();
+        const empId = document.getElementById('regEmpId').value.trim();
+        const boxes = [...document.querySelectorAll('input[name="regCategory"]')];
+        const categories = boxes.filter(b => b.checked).map(b => b.value);
+        if (!name || !empId) { alert("請填寫完整資訊"); return; }
+        if (!categories.length) { alert("請至少勾選一個組別"); return; }
+        const lockedCategory = categories.find(isLocked);
+        if (lockedCategory) { alert(lockedMessage(lockedCategory)); return; }
+        if (isAdmin) {
+            const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, { empId })));
+            if (dup) { alert(`此工號已報名【${CATEGORIES[dup].label}】`); return; }
+        }
+        if (name.length > 30) { alert("姓名最多 30 個字"); return; }
+        if (empId.length > 50) { alert("工號最多 50 個字"); return; }
+        const submitBtn = document.getElementById('submitBtn');
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        const timestamp = new Date().toISOString();
+        const updates = {};
+        categories.forEach(category => {
+            const id = db.ref('users').push().key;
+            updates[`users/${id}`] = { name, category, timestamp };
+            updates[`userPrivate/${id}`] = { empId };
+            updates[`empIndex/${empIndexKey(category, empId)}`] = id;
+        });
+        // 斷線時 Firebase 不會回報失敗，只會一直等，所以要自己設時限
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timeout')), 15000);
+        });
+        Promise.race([db.ref().update(updates), timeout])
+            .then(() => {
+                alert("報名成功！");
+                document.getElementById('regName').value = '';
+                document.getElementById('regEmpId').value = '';
+                boxes.forEach(b => { b.checked = false; });
+                switchTab('list');
+            })
+            .catch(err => {
+                const text = String((err && (err.code || err.message)) || err);
+                if (text.includes('timeout')) alert("連線逾時，請確認網路後到「報名名單」查看，沒有出現再重新報名。");
+                else if (/permission/i.test(text)) alert("報名失敗，沒有任何一組報名成功。\n可能是此工號已報名勾選的其中一組（請只勾尚未報名的組別）、該組已開賽，或報名已截止。");
+                else alert("報名失敗，請確認網路後再試一次。\n" + text);
+            })
+            .finally(() => { clearTimeout(timer); submitBtn.disabled = false; });
+    }
+
+    function renderList() {
+        const tbody = document.getElementById('registrantsTable');
+        if (!tbody) return;
+        const rowHtml = user => {
+            const dateStr = new Date(user.timestamp).toLocaleString('zh-TW');
+            const id = jsArg(user.id);
+            const catClass = `tag-${user.category}`;
+            const catInfo = CATEGORIES[user.category] || { label: user.category };
+            const categoryHtml = isAdmin ?
+                `<select class="admin-select" ${isLocked(user.category) ? 'disabled' : ''} onchange="updateUser(${id}, 'category', this.value, this)">
+                    ${Object.keys(CATEGORIES).map(c => `<option value="${c}" ${user.category === c ? 'selected' : ''} ${user.category !== c && isLocked(c) ? 'disabled' : ''}>${CATEGORIES[c].label}</option>`).join('')}
+                </select>` : `<span class="tag ${catClass}">${esc(catInfo.label)}</span>`;
+            const field = (key) => isAdmin
+                ? `<input class="edit-input" maxlength="${key === 'name' ? 30 : 50}" value="${esc(user[key])}" onchange="updateUser(${id}, '${key}', this.value, this)">`
+                : esc(user[key]);
+            return `<tr>
+                <td>${categoryHtml}</td>
+                <td>${field('name')}</td>
+                <td class="admin-action">${field('empId')}</td>
+                <td class="time-text nowrap col-time">${esc(dateStr)}</td>
+                <td class="admin-action row-actions"><button class="add-group-btn" onclick="openAddGroup(${id})">＋加組</button><button class="danger" ${isLocked(user.category) ? 'disabled title="已產生對戰表"' : ''} onclick="deleteUser(${id})">刪除</button></td>
+            </tr>`;
+        };
+        const personView = isAdmin && listView === 'person';
+        document.getElementById('viewGroupBtn').classList.toggle('active', !personView);
+        document.getElementById('viewPersonBtn').classList.toggle('active', personView);
+        if (personView) { renderPersonList(tbody); return; }
+        document.getElementById('listHead').innerHTML = `<tr>
+            <th class="nowrap">組別</th><th>姓名</th><th class="admin-action">工號</th>
+            <th class="nowrap col-time">報名時間</th><th class="admin-action">管理操作</th></tr>`;
+        tbody.innerHTML = Object.keys(CATEGORIES).map(category => {
+            const members = categoryUsers(category).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (!members.length) return '';
+            return `<tr class="group-row"><td colspan="5">${esc(CATEGORIES[category].label)}（${members.length} 人）</td></tr>` + members.map(rowHtml).join('');
+        }).join('');
+    }
+
+    // 每人一列（只有管理員看得到工號，才能認出同一人）
+    let listView = localStorage.getItem('goClubListView') === 'person' ? 'person' : 'group';
+    function setListView(view) {
+        listView = view;
+        localStorage.setItem('goClubListView', view);
+        renderList();
+    }
+    function personGroups() {
+        const people = new Map();
+        allUsers.forEach(u => {
+            const key = u.empId ? 'e:' + empKey(u.empId) : 'i:' + u.id;
+            if (!people.has(key)) people.set(key, []);
+            people.get(key).push(u);
+        });
+        return [...people.values()].sort((a, b) => a[0].name.localeCompare(b[0].name, 'zh-TW'));
+    }
+    function renderPersonList(tbody) {
+        const cats = Object.keys(CATEGORIES);
+        document.getElementById('listHead').innerHTML =
+            `<tr><th>姓名</th><th>工號</th>${cats.map(c => `<th class="nowrap">${esc(CATEGORIES[c].label)}</th>`).join('')}</tr>`;
+        tbody.innerHTML = personGroups().map(rows => {
+            const first = rows[0];
+            const id = jsArg(first.id);
+            const cells = cats.map(c => {
+                const row = rows.find(r => r.category === c);
+                const disabled = isLocked(c) ? 'disabled title="已產生對戰表"' : '';
+                const action = row ? `togglePersonGroup(${jsArg(row.id)}, null, this)` : `togglePersonGroup(${id}, '${c}', this)`;
+                return `<td class="person-check"><input type="checkbox" ${row ? 'checked' : ''} ${disabled} onchange="${action}"></td>`;
+            }).join('');
+            return `<tr>
+                <td><input class="edit-input" maxlength="30" value="${esc(first.name)}" onchange="updateUser(${id}, 'name', this.value, this)"></td>
+                <td><input class="edit-input" maxlength="50" value="${esc(first.empId)}" onchange="updateUser(${id}, 'empId', this.value, this)"></td>
+                ${cells}</tr>`;
+        }).join('');
+    }
+    // category 有值是加入；null 是退出 id 這一筆
+    function togglePersonGroup(id, category, box) {
+        if (!isAdmin) return;
+        if (category) { addGroups(id, [category]); return; }
+        deleteUser(id);
+        renderList(); // 取消刪除時把勾勾還原
+    }
+
+    // 加報：沿用這個人的姓名和工號
+    function addGroups(id, categories) {
+        const user = allUsers.find(u => u.id === id);
+        if (!isAdmin || !user || !categories.length) return Promise.resolve();
+        const failed = message => { alert(message); renderList(); return Promise.resolve(); };
+        if (!user.empId) return failed("這筆報名沒有工號，請先補上工號再加組。");
+        const lockedCat = categories.find(isLocked);
+        if (lockedCat) return failed(lockedMessage(lockedCat));
+        const dup = categories.find(c => allUsers.some(u => u.category === c && samePerson(u, user)));
+        if (dup) return failed(`這位選手已報名【${CATEGORIES[dup].label}】`);
+        const timestamp = new Date().toISOString();
+        const updates = {};
+        categories.forEach(category => {
+            const newId = db.ref('users').push().key;
+            updates[`users/${newId}`] = { name: user.name, category, timestamp };
+            updates[`userPrivate/${newId}`] = { empId: user.empId };
+            updates[`empIndex/${empIndexKey(category, user.empId)}`] = newId;
+        });
+        // 失敗時要重畫，勾勾才會還原
+        return db.ref().update(updates).catch(err => { showDbError(err); renderList(); });
+    }
+    let addGroupTarget = null;
+    function openAddGroup(id) {
+        const user = allUsers.find(u => u.id === id);
+        if (!isAdmin || !user) return;
+        addGroupTarget = id;
+        document.getElementById('addGroupTitle').textContent = `${user.name} 加報哪些組？`;
+        let selectable = 0;
+        document.getElementById('addGroupChoices').innerHTML = Object.keys(CATEGORIES).map(c => {
+            const joined = allUsers.some(u => u.category === c && (u.id === id || samePerson(u, user)));
+            const locked = isLocked(c);
+            if (!joined && !locked) selectable++;
+            const note = joined ? '（已報名）' : locked ? '（已開賽）' : '';
+            return `<label><input type="checkbox" value="${c}" ${joined ? 'checked' : ''} ${joined || locked ? 'disabled' : ''}> ${esc(CATEGORIES[c].label)} <span class="time-text">${note}</span></label>`;
+        }).join('');
+        document.getElementById('addGroupSubmit').disabled = selectable === 0;
+        document.getElementById('addGroupModal').style.display = 'flex';
+    }
+    function closeAddGroup() {
+        addGroupTarget = null;
+        document.getElementById('addGroupModal').style.display = 'none';
+    }
+    function submitAddGroup() {
+        const boxes = [...document.querySelectorAll('#addGroupChoices input:checked:not(:disabled)')];
+        if (!boxes.length) { alert("請至少勾選一個組別"); return; }
+        const id = addGroupTarget;
+        closeAddGroup();
+        addGroups(id, boxes.map(b => b.value));
+    }
+
+    function updateUser(id, field, rawValue, inputEl) {
+        if (!isAdmin) return;
+        const value = String(rawValue).trim();
+        const user = allUsers.find(u => u.id === id);
+        const restore = () => { if (inputEl && user) inputEl.value = user[field]; };
+        if (!value) { alert("不可為空白"); restore(); return; }
+        if (field === 'name' && value.length > 30) { alert("姓名最多 30 個字"); restore(); return; }
+        if (field === 'empId' && value.length > 50) { alert("工號最多 50 個字"); restore(); return; }
+        if (!user) return;
+        // 同一人報多組時，姓名和工號要一起改
+        const rows = allUsers.filter(u => u.id === id || samePerson(u, user));
+        if (field === 'empId') {
+            const conflict = rows.find(r => allUsers.some(u => !rows.includes(u) && u.category === r.category && samePerson(u, { empId: value })));
+            if (conflict) { alert(`此工號已報名【${CATEGORIES[conflict.category].label}】`); restore(); return; }
+            const updates = {};
+            rows.forEach(r => { if (r.empId) updates[`empIndex/${empIndexKey(r.category, r.empId)}`] = null; });
+            rows.forEach(r => {
+                updates[`userPrivate/${r.id}/empId`] = value;
+                updates[`empIndex/${empIndexKey(r.category, value)}`] = r.id;
+                if (r.legacyEmpId) updates[`users/${r.id}/empId`] = null;
+            });
+            write(db.ref().update(updates));
+            return;
+        }
+        if (field === 'category') {
+            if (value === user.category) return;
+            if (allUsers.some(u => u.id !== id && u.category === value && samePerson(u, user))) { alert(`這位選手已報名【${CATEGORIES[value].label}】`); restore(); return; }
+            const lockedCat = [user.category, value].find(isLocked);
+            if (lockedCat) { alert(lockedMessage(lockedCat)); restore(); return; }
+            const updates = { [`users/${id}/category`]: value };
+            if (user.empId) {
+                updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
+                updates[`empIndex/${empIndexKey(value, user.empId)}`] = id;
+            }
+            write(db.ref().update(updates));
+            return;
+        }
+        const updates = {};
+        rows.forEach(r => { updates[`users/${r.id}/${field}`] = value; });
+        write(db.ref().update(updates));
+    }
+
+    function deleteUser(id) {
+        if (!isAdmin) return;
+        const user = allUsers.find(u => u.id === id);
+        if (user && isLocked(user.category)) { alert(lockedMessage(user.category)); return; }
+        if (!confirm("確定要刪除這筆報名嗎？（只刪這一組）")) return;
+        const updates = { [`users/${id}`]: null, [`userPrivate/${id}`]: null };
+        if (user && user.empId) updates[`empIndex/${empIndexKey(user.category, user.empId)}`] = null;
+        write(db.ref().update(updates));
+    }
+
+    function clearBracket(category) {
+        if (!isAdmin) return;
+        if (!confirm(`確定要清空【${CATEGORIES[category].label}】的賽程嗎？\n(報名資料會保留)`)) return;
+        write(db.ref(`tournament/${category}`).remove().then(() => alert("賽程已清空")));
+    }
+
+    // 4. 產生對戰表
+    function generateBracket(category) {
+        if (!isAdmin) return;
+        const format = document.getElementById(`${category}-format`).value;
+        if (format === 'swiss') generateNextSwissRound(category);
+        else generateRoundRobinBracket(category);
+    }
+
+    window.deleteLastSwissRound = function(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        if (!data || !data.rounds || data.rounds.length === 0) { alert("沒有可以刪除的輪次！"); return; }
+        const roundNum = data.rounds.length;
+        const playoffNote = (data.playoffs || []).length ? `\n\n已有的 ${data.playoffs.length} 場加賽也會一起刪除。` : '';
+        if (!confirm(`⚠️ 危險操作：\n確定要刪除「第 ${roundNum} 輪」的對戰嗎？\n\n(這通常用於修正上一輪的成績錯誤)${playoffNote}`)) return;
+        // 刪到一輪都不剩就回到選賽制的畫面
+        const removal = roundNum === 1 ? db.ref(`tournament/${category}`).remove()
+            : db.ref(`tournament/${category}`).update({ rounds: data.rounds.slice(0, -1), playoffs: null });
+        write(removal
+            .then(() => alert(`已刪除第 ${roundNum} 輪。`)));
+    };
+
+    // 整輪配對：不重複對戰 > 勝場差距最小 > 排名相近。人多時分段計算，避免算太久
+    const MAX_EXACT_PLAYERS = 20;
+    const REMATCH_COST = 1000000;
+    const REPEAT_BYE_COST = 1000000000;
+    function solvePairs(pool) {
+        const memo = new Map();
+        const full = (1 << pool.length) - 1;
+        const solve = (mask) => {
+            if (mask === full) return { cost: 0, pairs: [] };
+            if (memo.has(mask)) return memo.get(mask);
+            let i = 0;
+            while (mask & (1 << i)) i++;
+            let best = null;
+            for (let j = i + 1; j < pool.length; j++) {
+                if (mask & (1 << j)) continue;
+                const gap = pool[i].wins - pool[j].wins;
+                const edge = gap * gap + (pool[i].played.includes(pool[j].id) ? REMATCH_COST : 0);
+                const rest = solve(mask | (1 << i) | (1 << j));
+                if (!best || edge + rest.cost < best.cost) best = { cost: edge + rest.cost, pairs: [[pool[i], pool[j]], ...rest.pairs] };
+            }
+            memo.set(mask, best);
+            return best;
+        };
+        return solve(0);
+    }
+    function pairPlayers(players) {
+        if (players.length <= MAX_EXACT_PLAYERS) return solvePairs(players);
+        const result = { cost: 0, pairs: [] };
+        for (let i = 0; i < players.length; i += 16) {
+            const part = solvePairs(players.slice(i, i + 16));
+            result.cost += part.cost;
+            result.pairs.push(...part.pairs);
+        }
+        return result;
+    }
+    function planRound(players) {
+        if (players.length % 2 === 0) return { bye: null, ...pairPlayers(players) };
+        let plan = null;
+        for (let b = players.length - 1; b >= 0; b--) {
+            const byePlayer = players[b];
+            const repeatBye = byePlayer.played.includes('BYE');
+            if (players.length > MAX_EXACT_PLAYERS && repeatBye && b > 0) continue;
+            const rest = pairPlayers(players.filter((_, i) => i !== b));
+            const cost = rest.cost + (repeatBye ? REPEAT_BYE_COST : 0);
+            if (!plan || cost < plan.cost) plan = { bye: byePlayer, pairs: rest.pairs, cost };
+            if (players.length > MAX_EXACT_PLAYERS) break;
+        }
+        return plan;
+    }
+
+    function lateJoiners(category, rounds) {
+        if (rounds.length === 0) return [];
+        const seen = new Set(rounds.flat().flatMap(m => [m.p1.id, m.p2.id]));
+        return categoryUsers(category).filter(u => !seen.has(u.id));
+    }
+
+    function generateNextSwissRound(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const rounds = (data && data.rounds) ? data.rounds : [];
+        const participants = categoryUsers(category).filter(u => !isWithdrawn(category, u.id)).map(u => ({ name: u.name, id: u.id, wins: 0, played: [] }));
+        if (participants.length < 2) { alert("人數不足，至少需要 2 人"); return; }
+
+        if (rounds.length > 0) {
+            const unfinished = rounds[rounds.length - 1].filter(m => !m.winner);
+            if (unfinished.length > 0) {
+                alert("⚠️ 上一輪還有比賽未登錄成績！\n請點擊獲勝者的名字。\n\n未完成場次：\n" +
+                    unfinished.map(m => `- ${nameOf(m.p1)} vs ${nameOf(m.p2)}`).join('\n') +
+                    "\n\n(選手已被刪除的場次，也要點另一位為勝者)");
+                return;
+            }
+        }
+        const roundLimit = participants.length % 2 === 0 ? participants.length - 1 : participants.length;
+        const newcomers = lateJoiners(category, rounds);
+        const extra = (rounds.length >= roundLimit ? `\n\n⚠️ 已打滿 ${roundLimit} 輪，再產生一定會重複對戰。` : '') +
+            (newcomers.length ? `\n\n⚠️ 中途加入、會以 0 勝排入：${newcomers.map(u => u.name).join('、')}\n不想讓他們參賽，請先取消，到名單刪除或換組。` : '');
+        if (!confirm(`確定要產生【${CATEGORIES[category].label}】第 ${rounds.length + 1} 輪對戰嗎？${extra}`)) return;
+
+        const winsOf = {};
+        rounds.flat().forEach(m => { if (m.winner) winsOf[m.winner] = (winsOf[m.winner] || 0) + 1; });
+        const byId = {};
+        participants.forEach(p => { byId[p.id] = p; p.wins = winsOf[p.id] || 0; });
+        rounds.flat().forEach(m => {
+            if (byId[m.p1.id]) byId[m.p1.id].played.push(m.p2.id);
+            if (byId[m.p2.id]) byId[m.p2.id].played.push(m.p1.id);
+        });
+        for (let i = participants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [participants[i], participants[j]] = [participants[j], participants[i]];
+        }
+        participants.forEach(p => { p.sos = p.played.reduce((acc, id) => acc + (winsOf[id] || 0), 0); });
+        participants.sort((a, b) => b.wins - a.wins || b.sos - a.sos);
+
+        const plan = planRound(participants);
+        const newRound = [];
+        if (plan.bye) newRound.push({ p1: { name: plan.bye.name, id: plan.bye.id }, p2: { name: "輪空", id: "BYE" }, winner: plan.bye.id });
+        plan.pairs.forEach(([p1, p2]) => newRound.push({ p1: { name: p1.name, id: p1.id }, p2: { name: p2.name, id: p2.id }, winner: null }));
+
+        if (rounds.length > 0) {
+            // 另一個分頁已先產生同一輪時，不要蓋掉
+            write(db.ref(`tournament/${category}/rounds/${rounds.length}`).transaction(current => current === null ? newRound : undefined));
+            return;
+        }
+        write(db.ref(`tournament/${category}`).set({
+            type: 'swiss',
+            rounds: [...rounds, newRound],
+            playoffs: (data && data.playoffs) || [],
+            timestamp: Date.now()
+        }));
+    }
+
+    function generateRoundRobinBracket(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const played = data ? (data.matches || []).filter(m => m.winner).length : 0;
+        const label = CATEGORIES[category].label;
+        const message = played > 0
+            ? `⚠️ 目前已有 ${played} 場成績，重新產生會全部清除，而且無法復原！\n確定要重新產生【${label}】循環賽嗎？`
+            : `確定要產生【${label}】循環賽對戰表嗎？`;
+        const participants = categoryUsers(category).map(u => ({ name: u.name, id: u.id }));
+        if (participants.length < 2) { alert("人數不足，至少需要 2 人"); return; }
+        if (!confirm(message)) return;
+        const matches = [];
+        for (let i = 0; i < participants.length; i++) {
+            for (let j = i + 1; j < participants.length; j++) {
+                matches.push({ p1: participants[i], p2: participants[j], winner: null });
+            }
+        }
+        write(db.ref(`tournament/${category}`).set({ type: 'round-robin', participants, matches, playoffs: [], timestamp: Date.now() }));
+    }
+
+    // 5. 排名：同主分（瑞士制再加同輔分）的人為一組，組內先比加賽勝場，再比彼此對戰勝場
+    function rankStandings(list, matches, playoffs) {
+        const key = s => `${s.wins}|${s.sos || 0}`;
+        const winsWithin = (s, games, group) => games.filter(m =>
+            m.winner === s.id && group.some(o => o.id !== s.id && isSamePair(m, s.id, o.id))).length;
+        const groups = {};
+        list.forEach(s => { (groups[key(s)] = groups[key(s)] || []).push(s); });
+        list.forEach(s => {
+            s.tiePlayoff = winsWithin(s, playoffs, groups[key(s)]);
+            s.tieDirect = winsWithin(s, matches, groups[key(s)]);
+        });
+        list.sort((a, b) => b.wins - a.wins || (b.sos || 0) - (a.sos || 0) ||
+            b.tiePlayoff - a.tiePlayoff || b.tieDirect - a.tieDirect);
+        // 完全分不出高下的人共用同一個名次
+        list.forEach((s, idx) => {
+            const prev = list[idx - 1];
+            const tied = prev && prev.wins === s.wins && (prev.sos || 0) === (s.sos || 0) &&
+                prev.tiePlayoff === s.tiePlayoff && prev.tieDirect === s.tieDirect;
+            s.rank = tied ? prev.rank : idx + 1;
+        });
+        return list;
+    }
+    function applyPlayoffStatus(stats, playoffs) {
+        playoffs.forEach(m => {
+            if (!m.winner) return;
+            const loserId = m.winner === m.p1.id ? m.p2.id : m.p1.id;
+            if (stats[m.winner]) stats[m.winner].playoffWins = (stats[m.winner].playoffWins || 0) + 1;
+            if (stats[loserId]) stats[loserId].playoffLosses = (stats[loserId].playoffLosses || 0) + 1;
+        });
+    }
+    function rankClass(rank) { return rank <= 3 ? 'rank-' + rank : ''; }
+    function rankLabel(s, list) {
+        return '#' + s.rank + (list.filter(o => o.rank === s.rank).length > 1 ? ' (同分)' : '');
+    }
+    function noteHtml(s, category) {
+        const withdrawn = isWithdrawn(category, s.id);
+        const tag = withdrawn ? '<span class="playoff-loss-text">🏳️ 棄權</span> ' : '';
+        const button = isAdmin ? ` <button class="withdraw-btn" onclick="toggleWithdraw('${category}', ${jsArg(s.id)})">${withdrawn ? '取消棄權' : '棄權'}</button>` : '';
+        return tag + playoffNote(s) + button;
+    }
+    function playoffNote(s) {
+        const wins = s.playoffWins || 0, losses = s.playoffLosses || 0;
+        if (wins && losses) return `<span class="playoff-win-text">加賽 ${wins} 勝 ${losses} 敗</span>`;
+        if (wins) return `<span class="playoff-win-text">🔥 加賽勝${wins > 1 ? ' ×' + wins : ''}</span>`;
+        if (losses) return `<span class="playoff-loss-text">💀 加賽敗${losses > 1 ? ' ×' + losses : ''}</span>`;
+        return '';
+    }
+
+    // 6. 畫面
+    function refreshBrackets() { Object.keys(CATEGORIES).forEach(renderBracket); }
+
+    function renderBracket(category) {
+        const data = bracketData[category];
+        const info = CATEGORIES[category];
+        const el = suffix => document.getElementById(`${category}-${suffix}`);
+        const type = data ? data.type : null;
+        el('title').textContent = `${info.label} 對戰表` + (type ? ` (${FORMATS[type]})` : '');
+        el('format-panel').style.display = (isAdmin && !data) ? 'block' : 'none';
+        el('swiss-actions').style.display = type === 'swiss' ? 'inline' : 'none';
+        el('rr-actions').style.display = type === 'round-robin' ? 'inline' : 'none';
+        el('swiss-hint').style.display = type === 'swiss' ? 'block' : 'none';
+        el('rr-hint').style.display = type === 'round-robin' ? 'block' : 'none';
+        el('content').style.display = data ? 'block' : 'none';
+        el('empty').style.display = data ? 'none' : 'block';
+        el('rounds').innerHTML = '';
+        el('grid').innerHTML = '';
+        el('notice').innerHTML = '';
+        if (!data) return;
+        if (type === 'swiss') renderSwiss(category, data); else renderRoundRobin(category, data);
+        renderPlayoffs(category, data, type === 'swiss' ? categoryUsers(category) : (data.participants || []));
+    }
+
+    function renderPlayoffs(category, data, players) {
+        const p1Select = document.getElementById(`${category}-playoff-p1`);
+        const p2Select = document.getElementById(`${category}-playoff-p2`);
+        [p1Select, p2Select].forEach(select => {
+            const kept = select.value;
+            select.innerHTML = '';
+            players.filter(p => !isWithdrawn(category, p.id)).forEach(p => select.add(new Option(nameOf(p), p.id)));
+            if (players.some(p => p.id === kept)) select.value = kept;
+        });
+        const container = document.getElementById(`${category}-playoff-matches`);
+        container.innerHTML = (data.playoffs || []).map((match, idx) => {
+            const del = isAdmin ? `<button onclick="deletePlayoff('${category}', ${idx})" style="float:right; background:none; border:none; color:red; cursor:pointer;">x</button>` : '';
+            return `<div class="match" style="margin:5px 10px;">${del}${createPlayerHtml(match.p1, match.p2, match.winner, category, idx, 0, 'playoff')}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(match.p2, match.p1, match.winner, category, idx, 0, 'playoff')}</div>`;
+        }).join('');
+    }
+
+    function renderSwiss(category, data) {
+        const rounds = data.rounds || [];
+        const playoffs = data.playoffs || [];
+        const newcomers = lateJoiners(category, rounds);
+        if (isAdmin && newcomers.length > 0) {
+            document.getElementById(`${category}-notice`).innerHTML =
+                `<p class="notice-text">⚠️ 中途加入，下一輪會以 0 勝排入：${esc(newcomers.map(u => u.name).join('、'))}</p>`;
+        }
+        document.getElementById(`${category}-rounds`).innerHTML = rounds.map((round, rIdx) => {
+            const mode = rIdx === rounds.length - 1 ? 'latest' : 'history';
+            const cards = round.map((m, mIdx) =>
+                `<div class="match" >${createPlayerHtml(m.p1, m.p2, m.winner, category, rIdx, mIdx, mode)}<div style='border-top:1px solid #eee; margin:2px 0;'></div>${createPlayerHtml(m.p2, m.p1, m.winner, category, rIdx, mIdx, mode)}</div>`).join('');
+            return `<div class="swiss-round-container"><div class="swiss-round-title">第 ${rIdx + 1} 輪</div><div class="match-grid">${cards}</div></div>`;
+        }).join('');
+
+        // 已被刪除或換組的選手，已打完的成績仍要算進去
+        const stats = {};
+        const addPlayer = p => { if (p.id !== 'BYE' && !stats[p.id]) stats[p.id] = { id: p.id, name: nameOf(p), wins: 0, opponents: [], playoffStatus: null }; };
+        categoryUsers(category).forEach(addPlayer);
+        const allMatches = rounds.flat();
+        allMatches.forEach(m => { addPlayer(m.p1); addPlayer(m.p2); });
+        allMatches.forEach(m => {
+            if (!m.winner) return;
+            if (stats[m.winner]) stats[m.winner].wins++;
+            if (m.p1.id !== 'BYE' && m.p2.id !== 'BYE') {
+                stats[m.p1.id].opponents.push(m.p2.id);
+                stats[m.p2.id].opponents.push(m.p1.id);
+            }
+        });
+        applyPlayoffStatus(stats, playoffs);
+        const list = Object.values(stats).map(s => ({ ...s, sos: s.opponents.reduce((acc, id) => acc + stats[id].wins, 0) }));
+        const standings = rankStandings(list, allMatches, playoffs);
+
+        document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>主分 (勝場)</th><th>輔分 (SOS)</th><th>備註</th><th>對戰紀錄</th></tr>';
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s =>
+            `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s, category)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
+    }
+
+    function renderRoundRobin(category, data) {
+        const participants = data.participants || [];
+        const matches = data.matches || [];
+        const playoffs = data.playoffs || [];
+
+        // 名單和對戰表不一致時提醒管理員
+        const inBracket = new Set(participants.map(p => p.id));
+        const missing = categoryUsers(category).filter(u => !inBracket.has(u.id));
+        if (isAdmin && missing.length > 0) {
+            document.getElementById(`${category}-notice`).innerHTML =
+                `<p class="notice-text">⚠️ 這些人是對戰表產生後才加入的，還沒有排入賽程：${esc(missing.map(u => u.name).join('、'))}。要加入請按「重新產生」（已有成績會清除）。</p>`;
+        }
+
+        const stats = {};
+        participants.forEach(p => { stats[p.id] = { id: p.id, name: nameOf(p), wins: 0, losses: 0, playoffStatus: null }; });
+        matches.forEach(m => {
+            if (!m.winner) return;
+            const loserId = m.winner === m.p1.id ? m.p2.id : m.p1.id;
+            if (stats[m.winner]) stats[m.winner].wins++;
+            if (stats[loserId]) stats[loserId].losses++;
+        });
+        applyPlayoffStatus(stats, playoffs);
+        const standings = rankStandings(Object.values(stats), matches, playoffs);
+
+        document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>勝</th><th>敗</th><th>勝率</th><th>備註</th></tr>';
+        document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s => {
+            const total = s.wins + s.losses;
+            const winRate = total > 0 ? Math.round(s.wins / total * 100) + '%' : '-';
+            return `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s, category)}</td></tr>`;
+        }).join('');
+
+        let grid = '<h3>⚔️ 對戰矩陣</h3><p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。管理員可點擊格子切換：勝 -> 敗 -> 未戰)</p><div class="table-wrap"><table class="rr-grid"><tr><th style="background:#eee;">選手</th>';
+        participants.forEach(p => { grid += `<th style="background:#eee;">${esc(nameOf(p))}</th>`; });
+        grid += '</tr>';
+        participants.forEach(rowP => {
+            grid += `<tr><td style="font-weight:bold; background:#fafafa;">${esc(nameOf(rowP))}${isWithdrawn(category, rowP.id) ? '（棄權）' : ''}</td>`;
+            participants.forEach(colP => {
+                if (rowP.id === colP.id) { grid += '<td class="rr-cell-self"></td>'; return; }
+                const matchIndex = matches.findIndex(m => isSamePair(m, rowP.id, colP.id));
+                if (matchIndex === -1) { grid += '<td>-</td>'; return; }
+                const winner = matches[matchIndex].winner;
+                let cellClass = !winner ? 'rr-cell-play' : winner === rowP.id ? 'rr-cell-win' : 'rr-cell-loss';
+                const text = !winner ? '未戰' : winner === rowP.id ? '勝' : '敗';
+                if (isAdmin) cellClass += ' rr-cell-clickable';
+                const onClick = isAdmin ? `onclick="toggleRRWinner('${category}', ${matchIndex}, ${jsArg(rowP.id)})"` : '';
+                grid += `<td class="${cellClass}" ${onClick}>${text}</td>`;
+            });
+            grid += '</tr>';
+        });
+        document.getElementById(`${category}-grid`).innerHTML = grid + '</table></div>';
+    }
+
+    // mode: latest(瑞士制最新輪) / history(瑞士制舊輪) / playoff(加賽)；playoff 時 rIdx 是加賽索引
+    function createPlayerHtml(player, opponent, winnerId, category, rIdx, mIdx, mode) {
+        let classes = 'player';
+        let badge = '';
+        if (player.id === 'BYE') classes += ' bye-text';
+        if (winnerId) {
+            if (winnerId === player.id) { classes += ' winner'; badge = '<span class="status-badge status-win">勝</span>'; }
+            else classes += ' loser';
+        } else if (player.id !== 'BYE' && mode !== 'playoff') {
+            badge = '<span class="status-badge">待輸入</span>';
+        }
+        let clickAction = '';
+        if (isAdmin) {
+            if (mode === 'history') {
+                classes += ' locked';
+                clickAction = `onclick="alert('⚠️ 無法修改歷史輪次的成績！\\n若需修正，請點擊上方的「刪除最後一輪」按鈕回溯。')"`;
+            } else if (mode === 'latest') {
+                if (!winnerId && player.id !== 'BYE') {
+                    classes += ' clickable';
+                    clickAction = `onclick="setSwissWinner('${category}', ${rIdx}, ${mIdx}, ${jsArg(player.id)})"`;
+                } else if (winnerId === player.id && opponent.id !== 'BYE') {
+                    classes += ' undoable';
+                    clickAction = `onclick="resetSwissMatch('${category}', ${rIdx}, ${mIdx})"`;
+                }
+            } else if (!winnerId || winnerId === player.id) {
+                classes += ' clickable';
+                clickAction = `onclick="setPlayoffWinner('${category}', ${rIdx}, ${jsArg(player.id)})"`;
+            }
+        }
+        const name = player.id === 'BYE' ? '輪空' : nameOf(player) + (isWithdrawn(category, player.id) ? '（棄權）' : '');
+        return `<div class="${classes}" ${clickAction}><span>${esc(name) || '-'}</span>${badge}</div>`;
+    }
+
+    // 7. 操作
+    window.setSwissWinner = function(category, rIdx, mIdx, winnerId) {
+        if (!isAdmin || !confirm("確認勝負？")) return;
+        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: winnerId }));
+    };
+    window.resetSwissMatch = function(category, rIdx, mIdx) {
+        if (!isAdmin || !confirm("確定要重置這場比賽嗎？")) return;
+        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: null, forfeit: null }));
+    };
+    window.toggleRRWinner = function(category, matchIndex, clickedPlayerId) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        if (!data || !data.matches) return;
+        const match = data.matches[matchIndex];
+        let newWinner = null;
+        if (!match.winner) newWinner = clickedPlayerId;
+        else if (match.winner === clickedPlayerId) newWinner = match.p1.id === clickedPlayerId ? match.p2.id : match.p1.id;
+        write(db.ref(`tournament/${category}/matches/${matchIndex}`).update({ winner: newWinner, forfeit: null }));
+    };
+    // 棄權：之後不再配對；還沒打的場次判給對手。瑞士制只有最新一輪會有未完成場次
+    window.toggleWithdraw = function(category, playerId) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        if (!data) return;
+        const swiss = data.type === 'swiss';
+        const rounds = data.rounds || [];
+        const last = rounds.length - 1;
+        const slots = swiss
+            ? (rounds[last] || []).map((m, i) => ({ m, path: `rounds/${last}/${i}` }))
+            : (data.matches || []).map((m, i) => ({ m, path: `matches/${i}` }));
+        const nameText = nameOf(data.participants ? (data.participants.find(p => p.id === playerId) || { id: playerId, name: '' }) : { id: playerId, name: '' });
+        const updates = {};
+        if (isWithdrawn(category, playerId)) {
+            const undo = slots.filter(({ m }) => m.forfeit === playerId);
+            if (!confirm(`確定要取消【${nameText}】的棄權嗎？\n${undo.length ? `因棄權判給對手的 ${undo.length} 場會變回未完成（對手也棄權的場次則改判給【${nameText}】）。` : ''}${swiss ? '\n下一輪起會重新配對。' : ''}`)) return;
+            updates[`withdrawn/${playerId}`] = null;
+            undo.forEach(({ m, path }) => {
+                // 對手仍在棄權中就直接判給取消棄權的人，否則這場沒人能打
+                const opponentId = m.p1.id === playerId ? m.p2.id : m.p1.id;
+                const opponentOut = isWithdrawn(category, opponentId);
+                updates[`${path}/winner`] = opponentOut ? playerId : null;
+                updates[`${path}/forfeit`] = opponentOut ? opponentId : null;
+            });
+        } else {
+            const open = slots.filter(({ m }) => !m.winner && (m.p1.id === playerId || m.p2.id === playerId));
+            if (!confirm(`確定要讓【${nameText}】棄權嗎？\n${open.length ? `還沒打的 ${open.length} 場會判給對手。` : ''}${swiss ? '\n之後不再配對，已打完的成績保留。' : '\n已打完的成績保留。'}`)) return;
+            updates[`withdrawn/${playerId}`] = true;
+            open.forEach(({ m, path }) => {
+                updates[`${path}/winner`] = m.p1.id === playerId ? m.p2.id : m.p1.id;
+                updates[`${path}/forfeit`] = playerId;
+            });
+        }
+        write(db.ref(`tournament/${category}`).update(updates));
+    };
+    window.addPlayoffMatch = function(category) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        const p1Id = document.getElementById(`${category}-playoff-p1`).value;
+        const p2Id = document.getElementById(`${category}-playoff-p2`).value;
+        if (!data || !p1Id || !p2Id) return;
+        if (p1Id === p2Id) { alert("不能選擇同一人對戰"); return; }
+        const toPlayer = id => { const known = (data.participants || []).find(p => p.id === id); return { id, name: nameOf({ id, name: known ? known.name : '' }) }; };
+        write(db.ref(`tournament/${category}/playoffs`).set([...(data.playoffs || []), { p1: toPlayer(p1Id), p2: toPlayer(p2Id), winner: null }]));
+    };
+    window.setPlayoffWinner = function(category, matchIdx, winnerId) {
+        if (!isAdmin || !confirm("確認加賽勝負？")) return;
+        const match = bracketData[category].playoffs[matchIdx];
+        write(db.ref(`tournament/${category}/playoffs/${matchIdx}`).update({ winner: match.winner === winnerId ? null : winnerId }));
+    };
+    window.deletePlayoff = function(category, idx) {
+        if (!isAdmin || !confirm("確定刪除這場加賽？")) return;
+        write(db.ref(`tournament/${category}/playoffs`).set(bracketData[category].playoffs.filter((_, i) => i !== idx)));
+    };
+
+    // 8. 啟動
+    document.getElementById('appTitle').addEventListener('click', () => {
+        clickCount++;
+        if (clickCount < 16) return;
+        clickCount = 0;
+        if (isAdmin) {
+            if (confirm("您已是管理員，要登出嗎？")) logout();
+            return;
+        }
+        openLogin();
+    });
+
+    localStorage.removeItem('goClubAdmin');
+    auth.onAuthStateChanged(user => {
+        if (user && user.uid !== ADMIN_UID) alert("這個帳號不是管理員。\n目前帳號 UID：" + user.uid);
+        setAdminMode(!!user && user.uid === ADMIN_UID);
+    });
+    refreshBrackets();
+
+    db.ref('config/registrationOpen').on('value', snapshot => {
+        const val = snapshot.val();
+        isRegistrationOpen = val === null ? true : val;
+        updateRegistrationUI();
+    });
+
+    Object.keys(CATEGORIES).forEach(category => {
+        db.ref(`tournament/${category}`).on('value', snapshot => {
+            bracketData[category] = snapshot.val();
+            renderBracket(category);
+            renderList();
+            updateCategoryLocks();
+        });
+    });
+
+    db.ref('users').on('value', snapshot => {
+        publicUsers = snapshot.val();
+        rebuildUsers();
+    });
+</script>
+
+</body>
+</html>
