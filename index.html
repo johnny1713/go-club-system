@@ -98,6 +98,7 @@
         .add-group-btn { background: #2471a3; }
         .person-check { text-align: center; }
         .person-check input { width: 20px; height: 20px; margin: 0; }
+        .withdraw-btn { background: #7f8c8d; padding: 3px 8px; font-size: 0.85em; }
         .rule-note { color: #2471a3; font-weight: bold; margin: 10px 0; }
         .time-text { font-size: 0.85em; color: #666; }
 
@@ -468,6 +469,10 @@
     // 產生對戰表後該組就鎖定，不能再加入或退出；要改名單得先清空賽程
     function isLocked(category) { return !!bracketData[category]; }
     function lockedMessage(category) { return `【${CATEGORIES[category].label}】已產生對戰表，不能加入或退出。\n如需更動，請先清空該組賽程（成績會一併清除）。`; }
+    function isWithdrawn(category, id) {
+        const data = bracketData[category];
+        return !!(data && data.withdrawn && data.withdrawn[id]);
+    }
     function updateCategoryLocks() {
         document.querySelectorAll('input[name="regCategory"]').forEach(box => {
             const locked = isLocked(box.value);
@@ -924,7 +929,7 @@
         if (!isAdmin) return;
         const data = bracketData[category];
         const rounds = (data && data.rounds) ? data.rounds : [];
-        const participants = categoryUsers(category).map(u => ({ name: u.name, id: u.id, wins: 0, played: [] }));
+        const participants = categoryUsers(category).filter(u => !isWithdrawn(category, u.id)).map(u => ({ name: u.name, id: u.id, wins: 0, played: [] }));
         if (participants.length < 2) { alert("人數不足，至少需要 2 人"); return; }
 
         if (rounds.length > 0) {
@@ -1029,7 +1034,13 @@
     function rankLabel(s, list) {
         return '#' + s.rank + (list.filter(o => o.rank === s.rank).length > 1 ? ' (同分)' : '');
     }
-    function noteHtml(s) {
+    function noteHtml(s, category) {
+        const withdrawn = isWithdrawn(category, s.id);
+        const tag = withdrawn ? '<span class="playoff-loss-text">🏳️ 棄權</span> ' : '';
+        const button = isAdmin ? ` <button class="withdraw-btn" onclick="toggleWithdraw('${category}', ${jsArg(s.id)})">${withdrawn ? '取消棄權' : '棄權'}</button>` : '';
+        return tag + playoffNote(s) + button;
+    }
+    function playoffNote(s) {
         const wins = s.playoffWins || 0, losses = s.playoffLosses || 0;
         if (wins && losses) return `<span class="playoff-win-text">加賽 ${wins} 勝 ${losses} 敗</span>`;
         if (wins) return `<span class="playoff-win-text">🔥 加賽勝${wins > 1 ? ' ×' + wins : ''}</span>`;
@@ -1067,7 +1078,7 @@
         [p1Select, p2Select].forEach(select => {
             const kept = select.value;
             select.innerHTML = '';
-            players.forEach(p => select.add(new Option(nameOf(p), p.id)));
+            players.filter(p => !isWithdrawn(category, p.id)).forEach(p => select.add(new Option(nameOf(p), p.id)));
             if (players.some(p => p.id === kept)) select.value = kept;
         });
         const container = document.getElementById(`${category}-playoff-matches`);
@@ -1112,7 +1123,7 @@
 
         document.getElementById(`${category}-standings-head`).innerHTML = '<tr><th>名次</th><th>姓名</th><th>主分 (勝場)</th><th>輔分 (SOS)</th><th>備註</th><th>對戰紀錄</th></tr>';
         document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s =>
-            `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
+            `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.sos}</td><td>${noteHtml(s, category)}</td><td style="font-size:0.8em; color:#666;">${esc(s.opponents.map(id => stats[id].name).join(', '))}</td></tr>`).join('');
     }
 
     function renderRoundRobin(category, data) {
@@ -1143,14 +1154,14 @@
         document.getElementById(`${category}-standings-body`).innerHTML = standings.map(s => {
             const total = s.wins + s.losses;
             const winRate = total > 0 ? Math.round(s.wins / total * 100) + '%' : '-';
-            return `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s)}</td></tr>`;
+            return `<tr><td class="${rankClass(s.rank)} nowrap">${rankLabel(s, standings)}</td><td>${esc(s.name)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${winRate}</td><td>${noteHtml(s, category)}</td></tr>`;
         }).join('');
 
         let grid = '<h3>⚔️ 對戰矩陣</h3><p style="font-size:0.9em; color:#666;">(橫列為選手，直欄為對手。管理員可點擊格子切換：勝 -> 敗 -> 未戰)</p><div class="table-wrap"><table class="rr-grid"><tr><th style="background:#eee;">選手</th>';
         participants.forEach(p => { grid += `<th style="background:#eee;">${esc(nameOf(p))}</th>`; });
         grid += '</tr>';
         participants.forEach(rowP => {
-            grid += `<tr><td style="font-weight:bold; background:#fafafa;">${esc(nameOf(rowP))}</td>`;
+            grid += `<tr><td style="font-weight:bold; background:#fafafa;">${esc(nameOf(rowP))}${isWithdrawn(category, rowP.id) ? '（棄權）' : ''}</td>`;
             participants.forEach(colP => {
                 if (rowP.id === colP.id) { grid += '<td class="rr-cell-self"></td>'; return; }
                 const matchIndex = matches.findIndex(m => isSamePair(m, rowP.id, colP.id));
@@ -1196,7 +1207,7 @@
                 clickAction = `onclick="setPlayoffWinner('${category}', ${rIdx}, ${jsArg(player.id)})"`;
             }
         }
-        const name = player.id === 'BYE' ? '輪空' : nameOf(player);
+        const name = player.id === 'BYE' ? '輪空' : nameOf(player) + (isWithdrawn(category, player.id) ? '（棄權）' : '');
         return `<div class="${classes}" ${clickAction}><span>${esc(name) || '-'}</span>${badge}</div>`;
     }
 
@@ -1207,7 +1218,7 @@
     };
     window.resetSwissMatch = function(category, rIdx, mIdx) {
         if (!isAdmin || !confirm("確定要重置這場比賽嗎？")) return;
-        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: null }));
+        write(db.ref(`tournament/${category}/rounds/${rIdx}/${mIdx}`).update({ winner: null, forfeit: null }));
     };
     window.toggleRRWinner = function(category, matchIndex, clickedPlayerId) {
         if (!isAdmin) return;
@@ -1217,7 +1228,36 @@
         let newWinner = null;
         if (!match.winner) newWinner = clickedPlayerId;
         else if (match.winner === clickedPlayerId) newWinner = match.p1.id === clickedPlayerId ? match.p2.id : match.p1.id;
-        write(db.ref(`tournament/${category}/matches/${matchIndex}`).update({ winner: newWinner }));
+        write(db.ref(`tournament/${category}/matches/${matchIndex}`).update({ winner: newWinner, forfeit: null }));
+    };
+    // 棄權：之後不再配對；還沒打的場次判給對手。瑞士制只有最新一輪會有未完成場次
+    window.toggleWithdraw = function(category, playerId) {
+        if (!isAdmin) return;
+        const data = bracketData[category];
+        if (!data) return;
+        const swiss = data.type === 'swiss';
+        const rounds = data.rounds || [];
+        const last = rounds.length - 1;
+        const slots = swiss
+            ? (rounds[last] || []).map((m, i) => ({ m, path: `rounds/${last}/${i}` }))
+            : (data.matches || []).map((m, i) => ({ m, path: `matches/${i}` }));
+        const nameText = nameOf(data.participants ? (data.participants.find(p => p.id === playerId) || { id: playerId, name: '' }) : { id: playerId, name: '' });
+        const updates = {};
+        if (isWithdrawn(category, playerId)) {
+            const undo = slots.filter(({ m }) => m.forfeit === playerId);
+            if (!confirm(`確定要取消【${nameText}】的棄權嗎？\n${undo.length ? `因棄權判給對手的 ${undo.length} 場會變回未完成。` : ''}${swiss ? '\n下一輪起會重新配對。' : ''}`)) return;
+            updates[`withdrawn/${playerId}`] = null;
+            undo.forEach(({ path }) => { updates[`${path}/winner`] = null; updates[`${path}/forfeit`] = null; });
+        } else {
+            const open = slots.filter(({ m }) => !m.winner && (m.p1.id === playerId || m.p2.id === playerId));
+            if (!confirm(`確定要讓【${nameText}】棄權嗎？\n${open.length ? `還沒打的 ${open.length} 場會判給對手。` : ''}${swiss ? '\n之後不再配對，已打完的成績保留。' : '\n已打完的成績保留。'}`)) return;
+            updates[`withdrawn/${playerId}`] = true;
+            open.forEach(({ m, path }) => {
+                updates[`${path}/winner`] = m.p1.id === playerId ? m.p2.id : m.p1.id;
+                updates[`${path}/forfeit`] = playerId;
+            });
+        }
+        write(db.ref(`tournament/${category}`).update(updates));
     };
     window.addPlayoffMatch = function(category) {
         if (!isAdmin) return;
